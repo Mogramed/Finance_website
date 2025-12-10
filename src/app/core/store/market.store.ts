@@ -1,11 +1,13 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   BehaviorSubject,
   Observable,
   Subject,
   combineLatest,
   distinctUntilChanged,
+  forkJoin,
   map,
+  of,
   scan,
   shareReplay,
   skip,
@@ -15,6 +17,9 @@ import {
   timer,
   withLatestFrom,
 } from 'rxjs';
+import { catchError, retry } from 'rxjs/operators';
+import { FinnhubService } from '../api/finnhub.service';
+
 
 /** ---------- Types ---------- */
 
@@ -27,15 +32,15 @@ export interface WatchlistItem {
 }
 
 export interface Filters {
-  query: string;          // recherche par symbole
-  minChangePct: number | null; // filtre sur variation mock (puis réelle)
+  query: string;
+  minChangePct: number | null;
   sortBy: SortBy;
   sortDir: SortDir;
 }
 
 export interface Settings {
-  apiToken: string | null; // (sera utilisé étape 2)
-  refreshMs: number;       // cadence live (mock puis API)
+  apiToken: string | null;
+  refreshMs: number;
 }
 
 export interface MarketState {
@@ -71,6 +76,17 @@ type Action =
 /** ---------- Storage ---------- */
 
 const STORAGE_KEY = 'rmd.market.v1';
+function getLocalStorage(): Storage | null {
+  try {
+    // SSR: globalThis existe, mais localStorage non
+    return typeof globalThis !== 'undefined' && 'localStorage' in globalThis
+      ? (globalThis as any).localStorage as Storage
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 
 function safeParse<T>(raw: string | null): T | null {
   if (!raw) return null;
@@ -86,7 +102,10 @@ function isValidSymbol(s: unknown): s is string {
 }
 
 function loadPersisted(): Partial<MarketState> {
-  const parsed = safeParse<Partial<MarketState>>(localStorage.getItem(STORAGE_KEY));
+  const ls = getLocalStorage();
+  if (!ls) return {}; // SSR: pas de localStorage
+
+  const parsed = safeParse<Partial<MarketState>>(ls.getItem(STORAGE_KEY));
   if (!parsed) return {};
 
   const watchlistRaw = Array.isArray(parsed.watchlist) ? parsed.watchlist : [];
@@ -113,11 +132,14 @@ function loadPersisted(): Partial<MarketState> {
 }
 
 function persistState(s: MarketState) {
+  const ls = getLocalStorage();
+  if (!ls) return; // SSR: pas de localStorage
+
   const payload: Partial<MarketState> = {
     watchlist: s.watchlist,
     settings: s.settings,
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  ls.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
 /** ---------- Reducer ---------- */
@@ -192,7 +214,7 @@ function reducer(state: MarketState, action: Action): MarketState {
   }
 }
 
-/** ---------- Mock quote generator (remplacé par API étape 2) ---------- */
+/** ---------- Mock quote generator (fallback si pas de token) ---------- */
 
 function hashString(s: string): number {
   let h = 0;
@@ -202,7 +224,7 @@ function hashString(s: string): number {
 
 function mockQuote(symbol: string, tick: number): QuoteVm {
   const h = hashString(symbol);
-  const base = 80 + (h % 220); // 80..299
+  const base = 80 + (h % 220);
   const wave1 = Math.sin((tick + (h % 10)) / 3) * 2.0;
   const wave2 = Math.sin(tick / 1.7 + (h % 100)) * 0.6;
   const price = Math.max(1, base + wave1 + wave2);
@@ -220,10 +242,12 @@ function mockQuote(symbol: string, tick: number): QuoteVm {
 
 @Injectable({ providedIn: 'root' })
 export class MarketStore {
+  private readonly finnhub = inject(FinnhubService);
+
   /** Subject = bus d’actions */
   private readonly actions$ = new Subject<Action>();
 
-  /** BehaviorSubject = snapshot courant (utile pour debug / last value) */
+  /** BehaviorSubject = snapshot courant */
   private readonly snapshotSubject = new BehaviorSubject<MarketState>(this.computeInitialState());
   readonly snapshot$ = this.snapshotSubject.asObservable();
 
@@ -260,6 +284,14 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: false })
   );
 
+  readonly apiToken$ = this.settings$.pipe(
+    map((s) => s.apiToken),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: false })
+  );
+
+  readonly hasToken$ = this.apiToken$.pipe(map((t) => !!t));
+
   readonly watchlistCount$ = this.watchlist$.pipe(map((w) => w.length));
 
   /** Tick “live” dépendant de refreshMs (switchMap) */
@@ -270,10 +302,39 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: false })
   );
 
-  /** Quotes mock “live” (withLatestFrom + map) */
-  readonly quotes$ = this.liveTick$.pipe(
-    withLatestFrom(this.watchlist$),
-    map(([tick, list]) => list.map((w) => mockQuote(w.symbol, Number(tick)))),
+  /** Quotes live: Finnhub si token, sinon fallback mock */
+  readonly quotes$ = combineLatest([this.liveTick$, this.watchlist$, this.apiToken$]).pipe(
+    switchMap(([tick, list, token]) => {
+      if (!token) {
+        return of(list.map((w) => mockQuote(w.symbol, Number(tick))));
+      }
+
+      // /quote en parallèle
+      return forkJoin(
+        list.map((w) =>
+          this.finnhub.quote(w.symbol, token).pipe(
+            retry({
+              count: 2,
+              delay: (_err, retryCount) => timer(250 * retryCount),
+            }),
+            map((q) => ({
+              symbol: w.symbol,
+              price: q.c,
+              changePct: q.dp,
+              ts: q.t ? q.t * 1000 : Date.now(),
+            })),
+            catchError(() =>
+              of({
+                symbol: w.symbol,
+                price: Number.NaN,
+                changePct: 0,
+                ts: Date.now(),
+              })
+            )
+          )
+        )
+      );
+    }),
     shareReplay({ bufferSize: 1, refCount: false })
   );
 

@@ -21,7 +21,6 @@ export class Settings {
   readonly refreshCtrl = new FormControl<number>(1500, { nonNullable: true });
 
   constructor() {
-    // init controls from store (sans reboucler)
     this.settings$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((s) => {

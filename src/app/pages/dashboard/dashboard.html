@@ -3,13 +3,20 @@
     <div>
       <h1>Dashboard</h1>
       <p class="muted">
-        Store RxJS central (Subject + BehaviorSubject) + flux dérivés (combineLatest / switchMap).
+        Finnhub REST (/quote) + Store RxJS central (combineLatest / switchMap / forkJoin / retry / shareReplay).
       </p>
     </div>
 
     <div class="head-actions">
       <span class="pill">watchlist: {{ (count$ | async) ?? 0 }}</span>
       <button class="btn" type="button" (click)="reset()">Reset</button>
+    </div>
+  </div>
+
+  <div class="card warn" *ngIf="(hasToken$ | async) === false">
+    <strong>Clé API manquante</strong>
+    <div class="muted">
+      Va dans <a routerLink="/settings">Settings</a> pour coller ton token (sinon fallback mock).
     </div>
   </div>
 
@@ -41,10 +48,24 @@
           <option value="asc">Asc</option>
         </select>
       </label>
+    </div>
 
+    <div class="row addrow">
       <label class="grow">
-        <span class="lbl">Ajouter</span>
+        <span class="lbl">Ajouter (typeahead Finnhub)</span>
         <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="ex: NVDA" />
+
+        <div class="suggestions" *ngIf="addSuggestions$ | async as s">
+          <button
+            class="suggestion"
+            *ngFor="let it of s"
+            type="button"
+            (click)="pickSuggestion(it.symbol)"
+          >
+            <strong>{{ it.symbol }}</strong>
+            <span class="muted">— {{ it.description }}</span>
+          </button>
+        </div>
       </label>
 
       <button class="btn" type="button" (click)="add()">Add</button>
@@ -53,7 +74,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2>Watchlist (mock live)</h2>
+      <h2>Watchlist (live)</h2>
 
       <div class="muted" *ngIf="(vm$ | async)?.length === 0">
         Rien (ajoute un symbole).

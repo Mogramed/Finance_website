@@ -11,11 +11,23 @@
   align-items: center;
 }
 
+.warn {
+  margin-top: 12px;
+}
+
+.controls {
+  margin-top: 12px;
+}
+
 .controls .row {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   align-items: end;
+}
+
+.addrow {
+  margin-top: 10px;
 }
 
 label {
@@ -27,7 +39,7 @@ label {
 
 .grow {
   flex: 1;
-  min-width: 220px;
+  min-width: 260px;
 }
 
 .lbl {
@@ -43,6 +55,7 @@ label {
   color: var(--text);
   outline: none;
 }
+
 .inp:focus {
   border-color: rgba(100, 255, 218, 0.35);
 }
@@ -115,4 +128,25 @@ label {
   color: var(--muted);
   overflow: auto;
   max-height: 520px;
+}
+
+/* Suggestions */
+.suggestions {
+  width: 100%;
+  margin-top: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.suggestion {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  color: var(--text);
+  cursor: pointer;
+}
+.suggestion:hover {
+  background: rgba(255,255,255,0.06);
 }

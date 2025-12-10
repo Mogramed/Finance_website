@@ -1,12 +1,14 @@
 <section class="page">
   <h1>Settings</h1>
-  <p class="muted">Ces valeurs alimentent des flux RxJS (ex: refreshMs$ → switchMap(timer)).</p>
+  <p class="muted">
+    Le token et le refresh alimentent des flux RxJS (ex: refreshMs$ → switchMap(timer)).
+  </p>
 
   <div class="card">
     <div class="row">
       <label class="grow">
-        <span class="lbl">API Token (Finnhub à l’étape 2)</span>
-        <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici" />
+        <span class="lbl">Finnhub API Token</span>
+        <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici (ne pas commit)" />
       </label>
 
       <label>
