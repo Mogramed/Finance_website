@@ -1,0 +1,125 @@
+.shell {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 64px 1fr;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar content";
+}
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(15, 22, 32, 0.65);
+  backdrop-filter: blur(10px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 20px rgba(100, 255, 218, 0.25);
+  }
+
+  .name {
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+
+  .badge {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+}
+
+.topnav a {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  color: var(--muted);
+
+  &.active,
+  &:hover {
+    color: var(--text);
+    border-color: var(--border);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.sidebar {
+  grid-area: sidebar;
+  border-right: 1px solid var(--border);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(15, 22, 32, 0.35);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    color: var(--muted);
+    border: 1px solid transparent;
+
+    .icon {
+      width: 22px;
+      text-align: center;
+    }
+
+    &.active,
+    &:hover {
+      color: var(--text);
+      border-color: var(--border);
+      background: rgba(255, 255, 255, 0.03);
+    }
+  }
+}
+
+.hint {
+  margin-top: auto;
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+
+  .hint-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .hint-text {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+}
+
+.content {
+  grid-area: content;
+  padding: 18px;
+}

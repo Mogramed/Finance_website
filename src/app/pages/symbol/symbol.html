@@ -1,0 +1,19 @@
+<section class="page">
+  <h1>
+    Détail action :
+    <span class="pill">{{ symbol$ | async }}</span>
+  </h1>
+
+  <p class="muted">
+    Ici on branchera : quote$, candles$, profile$, news$ (REST + WebSocket) via flux RxJS.
+  </p>
+
+  <div class="card">
+    <h2>À venir</h2>
+    <ul class="list">
+      <li>Header live (price, change, %)</li>
+      <li>Graph (candles + trades stream)</li>
+      <li>News + filtres</li>
+    </ul>
+  </div>
+</section>

@@ -1,0 +1,15 @@
+.grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(12, 1fr);
+
+  .card:nth-child(1) { grid-column: span 6; }
+  .card:nth-child(2) { grid-column: span 6; }
+  .card:nth-child(3) { grid-column: span 12; }
+}
+
+.placeholder {
+  color: var(--muted);
+  margin-top: 8px;
+}
