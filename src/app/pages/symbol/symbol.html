@@ -32,32 +32,28 @@
 
   <div class="grid">
     <div class="card">
-      <h2>Quote (live)</h2>
+  <h2>Quote (live)</h2>
 
-      <div class="quote" *ngIf="quote$ | async as q; else noQuote">
-        <div class="price">{{ q.c | number:'1.2-2' }}</div>
+  <ng-container *ngIf="quote$ | async as q; else noQuote">
+    <div class="price">
+      {{ isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}
+    </div>
 
-        <div class="quote" *ngIf="quote$ | async as q; else noQuote">
-  <div class="price">
-    {{ isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}
-  </div>
+    <div class="chg"
+         [class.pos]="isFiniteNumber(q.dp) && q.dp >= 0"
+         [class.neg]="isFiniteNumber(q.dp) && q.dp < 0">
+      {{ isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
+      <span class="muted"> ({{ isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
+    </div>
 
-  <div class="chg"
-       [class.pos]="isFiniteNumber(q.dp) && q.dp >= 0"
-       [class.neg]="isFiniteNumber(q.dp) && q.dp < 0">
-    {{ isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
-    <span class="muted"> ({{ isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
-  </div>
+    <div class="muted mini">O {{ q.o }} • H {{ q.h }} • L {{ q.l }} • Prev {{ q.pc }}</div>
+  </ng-container>
+
+  <ng-template #noQuote>
+    <div class="muted">Pas de quote (token manquant, rate limit, ou symbole invalide).</div>
+  </ng-template>
 </div>
 
-
-        <div class="muted mini">O {{ q.o }} • H {{ q.h }} • L {{ q.l }} • Prev {{ q.pc }}</div>
-      </div>
-
-      <ng-template #noQuote>
-        <div class="muted">Pas de quote (token manquant ou symbole invalide).</div>
-      </ng-template>
-    </div>
 
     <div class="card">
       <div class="row">

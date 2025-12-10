@@ -9,9 +9,12 @@ import {
   distinctUntilChanged,
   map,
   of,
+  timer,
   shareReplay,
   startWith,
   switchMap,
+  exhaustMap, 
+  withLatestFrom,
 } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 
@@ -105,16 +108,18 @@ export class Symbol {
 
 
   // Quote live (refresh = liveTick$) : combineLatest + switchMap
-  readonly quote$ = combineLatest([this.symbol$, this.token$, this.store.liveTick$]).pipe(
-    switchMap(([sym, token]) => {
-      if (!token || !sym) return of(null);
-      return this.finnhub.quote(sym, token).pipe(
-        retry({ count: 2, delay: (_e, i) => of(null).pipe(debounceTime(200 * i)) }),
-        catchError(() => of(null))
-      );
-    }),
-    shareReplay({ bufferSize: 1, refCount: true })
-  );
+  readonly quote$ = this.store.liveTick$.pipe(
+  withLatestFrom(this.symbol$, this.token$),
+  exhaustMap(([_, sym, token]) => {
+    if (!token || !sym) return of(null);
+    return this.finnhub.quote(sym, token).pipe(
+      retry({ count: 2, delay: (_e, i) => timer(200 * i) }),
+      catchError(() => of(null))
+    );
+  }),
+  shareReplay({ bufferSize: 1, refCount: true })
+);
+
 
   // Profile : 1 call par symbol/token (pas lié au tick)
   readonly profile$ = combineLatest([this.symbol$, this.token$]).pipe(

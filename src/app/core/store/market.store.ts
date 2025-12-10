@@ -16,6 +16,7 @@ import {
   tap,
   timer,
   withLatestFrom,
+  exhaustMap,
 } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 import { FinnhubService } from '../api/finnhub.service';
@@ -304,39 +305,32 @@ export class MarketStore {
 
   /** Quotes live: Finnhub si token, sinon fallback mock */
   readonly quotes$ = combineLatest([this.liveTick$, this.watchlist$, this.apiToken$]).pipe(
-    switchMap(([tick, list, token]) => {
-      if (!token) {
-        return of(list.map((w) => mockQuote(w.symbol, Number(tick))));
-      }
+  exhaustMap(([tick, list, token]) => {
+    if (!token) {
+      return of(list.map((w) => mockQuote(w.symbol, Number(tick))));
+    }
+    if (list.length === 0) return of([]);
 
-      // /quote en parallèle
-      return forkJoin(
-        list.map((w) =>
-          this.finnhub.quote(w.symbol, token).pipe(
-            retry({
-              count: 2,
-              delay: (_err, retryCount) => timer(250 * retryCount),
-            }),
-            map((q) => ({
-              symbol: w.symbol,
-              price: q.c,
-              changePct: q.dp,
-              ts: q.t ? q.t * 1000 : Date.now(),
-            })),
-            catchError(() =>
-              of({
-                symbol: w.symbol,
-                price: Number.NaN,
-                changePct: 0,
-                ts: Date.now(),
-              })
-            )
+    return forkJoin(
+      list.map((w) =>
+        this.finnhub.quote(w.symbol, token).pipe(
+          retry({ count: 2, delay: (_err, retryCount) => timer(250 * retryCount) }),
+          map((q) => ({
+            symbol: w.symbol,
+            price: q.c,
+            changePct: q.dp,
+            ts: q.t ? q.t * 1000 : Date.now(),
+          })),
+          catchError(() =>
+            of({ symbol: w.symbol, price: Number.NaN, changePct: 0, ts: Date.now() })
           )
         )
-      );
-    }),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
+      )
+    );
+  }),
+  shareReplay({ bufferSize: 1, refCount: false })
+);
+
 
   /** Watchlist enrichie (combineLatest) */
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
