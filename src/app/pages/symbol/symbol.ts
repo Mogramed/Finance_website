@@ -15,6 +15,7 @@ import {
   switchMap,
   exhaustMap, 
   withLatestFrom,
+  filter
 } from 'rxjs';
 import { catchError, retry } from 'rxjs/operators';
 
@@ -109,17 +110,16 @@ export class Symbol {
 
   // Quote live (refresh = liveTick$) : combineLatest + switchMap
   readonly quote$ = this.store.liveTick$.pipe(
-  withLatestFrom(this.symbol$, this.token$),
-  exhaustMap(([_, sym, token]) => {
-    if (!token || !sym) return of(null);
-    return this.finnhub.quote(sym, token).pipe(
-      retry({ count: 2, delay: (_e, i) => timer(200 * i) }),
-      catchError(() => of(null))
-    );
-  }),
-  shareReplay({ bufferSize: 1, refCount: true })
-);
-
+    withLatestFrom(this.symbol$, this.token$),
+    filter(([, sym, token]) => !!sym && !!token),
+    exhaustMap(([, sym, token]) =>
+      this.finnhub.quote(sym, token!).pipe(
+        retry({ count: 2, delay: (_e, i) => timer(250 * i) }),
+        catchError(() => of(null))
+      )
+    ),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
 
   // Profile : 1 call par symbol/token (pas lié au tick)
   readonly profile$ = combineLatest([this.symbol$, this.token$]).pipe(
@@ -146,19 +146,28 @@ export class Symbol {
   );
 
   // Candles : combineLatest + switchMap (se déclenche quand sym/token/days/resolution changent)
-  readonly candles$ = combineLatest([this.symbol$, this.token$, this.resolution$, this.days$]).pipe(
-    switchMap(([sym, token, res, days]) => {
-      if (!token || !sym) return of(null);
+readonly candles$ = combineLatest([this.symbol$, this.token$, this.resolution$, this.days$]).pipe(
+  switchMap(([sym, token, res, days]) => {
+    if (!token || !sym) return of(null);
 
-      const to = new Date();
-      const from = new Date(Date.now() - days * 24 * 3600 * 1000);
+    const safeDays = res === 'D' ? days : Math.min(days, 10);
+    const to = new Date();
+    const from = new Date(Date.now() - safeDays * 24 * 3600 * 1000);
 
-      return this.finnhub.candles(sym, res, toUnixSec(from), toUnixSec(to), token).pipe(
-        catchError(() => of(null))
-      );
-    }),
-    shareReplay({ bufferSize: 1, refCount: true })
-  );
+    const fromSec = toUnixSec(from);
+    const toSec = toUnixSec(to);
+
+    return this.finnhub.candles(sym, res, fromSec, toSec, token).pipe(
+      switchMap(c => (c?.s === 'ok' ? of(c) : res !== 'D'
+        ? this.finnhub.candles(sym, 'D', fromSec, toSec, token)
+        : of(c)
+      )),
+      catchError(() => of(null))
+    );
+  }),
+  shareReplay({ bufferSize: 1, refCount: true })
+);
+
 
   // Chart VM (SVG points)
   readonly chartVm$ = this.candles$.pipe(
