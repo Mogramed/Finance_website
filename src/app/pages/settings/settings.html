@@ -1,11 +1,22 @@
 <section class="page">
   <h1>Settings</h1>
-  <p class="muted">
-    Prochaine étape : stocker le token API (BehaviorSubject + localStorage) et configurer la fréquence de refresh.
-  </p>
+  <p class="muted">Ces valeurs alimentent des flux RxJS (ex: refreshMs$ → switchMap(timer)).</p>
 
   <div class="card">
-    <h2>À venir</h2>
-    <div class="muted">Token Finnhub / TwelveData + refreshRate$</div>
+    <div class="row">
+      <label class="grow">
+        <span class="lbl">API Token (Finnhub à l’étape 2)</span>
+        <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici" />
+      </label>
+
+      <label>
+        <span class="lbl">Refresh (ms)</span>
+        <input class="inp" type="number" [formControl]="refreshCtrl" />
+      </label>
+    </div>
+
+    <div class="muted mini" *ngIf="settings$ | async as s">
+      refreshMs = {{ s.refreshMs }} • token = {{ s.apiToken ? '✅ set' : '—' }}
+    </div>
   </div>
 </section>

@@ -1,15 +1,118 @@
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.head-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.controls .row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.grow {
+  flex: 1;
+  min-width: 220px;
+}
+
+.lbl {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inp {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  outline: none;
+}
+.inp:focus {
+  border-color: rgba(100, 255, 218, 0.35);
+}
+
 .grid {
   margin-top: 14px;
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(12, 1fr);
 
-  .card:nth-child(1) { grid-column: span 6; }
-  .card:nth-child(2) { grid-column: span 6; }
-  .card:nth-child(3) { grid-column: span 12; }
+  > .card:nth-child(1) { grid-column: span 7; }
+  > .card:nth-child(2) { grid-column: span 5; }
 }
 
-.placeholder {
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 90px 1fr 120px 34px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.sym {
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.price {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chg {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
-  margin-top: 8px;
+}
+.chg.pos { color: rgba(100, 255, 218, 0.95); }
+.chg.neg { color: rgba(255, 120, 120, 0.95); }
+
+.icon-btn {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  height: 30px;
+}
+.icon-btn:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.pre {
+  margin: 10px 0 0;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--muted);
+  overflow: auto;
+  max-height: 520px;
 }

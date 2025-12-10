@@ -1,21 +1,82 @@
 <section class="page">
-  <h1>Dashboard</h1>
-  <p class="muted">Watchlist live, filtres réactifs, graphiques, et détails par action.</p>
+  <div class="head">
+    <div>
+      <h1>Dashboard</h1>
+      <p class="muted">
+        Store RxJS central (Subject + BehaviorSubject) + flux dérivés (combineLatest / switchMap).
+      </p>
+    </div>
+
+    <div class="head-actions">
+      <span class="pill">watchlist: {{ (count$ | async) ?? 0 }}</span>
+      <button class="btn" type="button" (click)="reset()">Reset</button>
+    </div>
+  </div>
+
+  <div class="card controls">
+    <div class="row">
+      <label>
+        <span class="lbl">Recherche</span>
+        <input class="inp" [formControl]="queryCtrl" placeholder="AAPL, TSLA, MSFT..." />
+      </label>
+
+      <label>
+        <span class="lbl">Min change %</span>
+        <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="ex: 0.5" />
+      </label>
+
+      <label>
+        <span class="lbl">Tri</span>
+        <select class="inp" [formControl]="sortByCtrl">
+          <option value="addedAt">Ajout</option>
+          <option value="symbol">Symbole</option>
+          <option value="changePct">Variation %</option>
+        </select>
+      </label>
+
+      <label>
+        <span class="lbl">Sens</span>
+        <select class="inp" [formControl]="sortDirCtrl">
+          <option value="desc">Desc</option>
+          <option value="asc">Asc</option>
+        </select>
+      </label>
+
+      <label class="grow">
+        <span class="lbl">Ajouter</span>
+        <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="ex: NVDA" />
+      </label>
+
+      <button class="btn" type="button" (click)="add()">Add</button>
+    </div>
+  </div>
 
   <div class="grid">
     <div class="card">
-      <h2>Watchlist (à venir)</h2>
-      <div class="placeholder">Flux RxJS → quote$ → UI auto-update</div>
+      <h2>Watchlist (mock live)</h2>
+
+      <div class="muted" *ngIf="(vm$ | async)?.length === 0">
+        Rien (ajoute un symbole).
+      </div>
+
+      <ul class="list" *ngIf="vm$ | async as items">
+        <li *ngFor="let it of items" class="item">
+          <a class="sym" [routerLink]="['/symbol', it.symbol]">{{ it.symbol }}</a>
+
+          <span class="price">{{ it.price | number:'1.2-2' }}</span>
+
+          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
+            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
+          </span>
+
+          <button class="icon-btn" type="button" (click)="remove(it.symbol)">✕</button>
+        </li>
+      </ul>
     </div>
 
     <div class="card">
-      <h2>Top movers (à venir)</h2>
-      <div class="placeholder">combineLatest + filter + sort</div>
-    </div>
-
-    <div class="card">
-      <h2>News (à venir)</h2>
-      <div class="placeholder">debounceTime + switchMap</div>
+      <h2>State (debug)</h2>
+      <pre class="pre">{{ stateJson$ | async }}</pre>
     </div>
   </div>
 </section>

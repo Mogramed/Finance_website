@@ -1,7 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { distinctUntilChanged, map, shareReplay, Observable } from 'rxjs';
+import { distinctUntilChanged, map, shareReplay, tap } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MarketStore } from '../../core/store/market.store';
 
 @Component({
   selector: 'app-symbol',
@@ -10,13 +12,22 @@ import { distinctUntilChanged, map, shareReplay, Observable } from 'rxjs';
   styleUrl: './symbol.scss',
 })
 export class Symbol {
-  symbol$: Observable<string>;
+  private readonly route = inject(ActivatedRoute);
+  private readonly store = inject(MarketStore);
+  private readonly destroyRef = inject(DestroyRef);
 
-  constructor(private readonly route: ActivatedRoute) {
-    this.symbol$ = this.route.paramMap.pipe(
-      map((p) => (p.get('symbol') ?? '').toUpperCase()),
-      distinctUntilChanged(),
-      shareReplay({ bufferSize: 1, refCount: true })
-    );
+  readonly symbol$ = this.route.paramMap.pipe(
+    map((p) => (p.get('symbol') ?? '').toUpperCase()),
+    distinctUntilChanged(),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
+
+  constructor() {
+    this.symbol$
+      .pipe(
+        tap((sym) => this.store.selectSymbol(sym)),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe();
   }
 }
