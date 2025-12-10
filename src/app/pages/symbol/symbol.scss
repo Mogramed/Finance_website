@@ -1,28 +1,138 @@
-.list {
-  margin: 8px 0 0;
-  color: var(--muted);
-  line-height: 1.6;
-}
-.item {
+.head {
   display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: var(--radius);
-  cursor: pointer;
+}
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--text);
-  }
+.grid {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(12, 1fr);
+}
 
-  .symbol {
-    font-size: 18px;
-    width: 24px;
-    text-align: center;
-  }
+.card { grid-column: span 6; }
+.card.wide { grid-column: span 12; }
 
-  .name {
-    flex-grow: 1;
-  }
+.quote {
+  margin-top: 10px;
+}
+
+.price {
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+}
+
+.chg {
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.chg.pos { color: rgba(100, 255, 218, 0.95); }
+.chg.neg { color: rgba(255, 120, 120, 0.95); }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lbl {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inp {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(0,0,0,0.25);
+  color: var(--text);
+  outline: none;
+}
+
+.chart {
+  margin-top: 10px;
+  color: rgba(100, 255, 218, 0.95);
+}
+
+svg {
+  width: 100%;
+  height: 160px;
+  display: block;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.news {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.news-item {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  text-decoration: none;
+  color: var(--text);
+}
+
+.news-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.ttl {
+  font-weight: 800;
+}
+
+.meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.pill2 {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  font-size: 12px;
+}
+
+.sum {
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sum.expanded {
+  -webkit-line-clamp: unset;
 }
