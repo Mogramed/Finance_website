@@ -21,17 +21,19 @@ import { TwelveDataService } from '../../core/api/twelvedata.service';
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
-  readonly store = inject(MarketStore); // 'protected' n'est pas nécessaire si on utilise readonly sans modificateur en TS strict parfois, mais readonly suffit ici
+  readonly store = inject(MarketStore);
   private readonly twelveData = inject(TwelveDataService);
   private readonly destroyRef = inject(DestroyRef);
 
+  // Données principales
   readonly vm$ = this.store.filteredWatchlistVm$;
   readonly count$ = this.store.watchlistCount$;
-  readonly hasToken$ = this.store.hasToken$;
-  
-  // Pour savoir quel onglet est actif (Observable)
   readonly activeTab$ = this.store.filters$.pipe(map(f => f.assetType));
+  
+  // Données Stats
+  readonly stats$ = this.store.stats$;
 
+  // Form Controls
   readonly queryCtrl = new FormControl('', { nonNullable: true });
   readonly minChangeCtrl = new FormControl<number | null>(null);
   readonly sortByCtrl = new FormControl('addedAt', { nonNullable: true });
@@ -73,7 +75,6 @@ export class Dashboard {
     ).subscribe((v) => this.store.setSort(this.sortByCtrl.value as any, v as any));
   }
   
-  // Méthode pour changer l'onglet
   setTab(type: FilterType) {
     this.store.setAssetType(type);
   }

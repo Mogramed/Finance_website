@@ -20,7 +20,8 @@ import { UniversalQuote, AssetType } from '../api/market-interfaces';
 /** ---------- Types ---------- */
 export type SortBy = 'symbol' | 'addedAt' | 'changePct';
 export type SortDir = 'asc' | 'desc';
-export type FilterType = 'ALL' | AssetType; // Nouveau type pour les onglets
+// On ajoute 'STATS' ici pour gérer l'onglet
+export type FilterType = 'ALL' | AssetType | 'STATS'; 
 
 export interface WatchlistItem {
   symbol: string;
@@ -32,7 +33,7 @@ export interface Filters {
   minChangePct: number | null;
   sortBy: SortBy;
   sortDir: SortDir;
-  assetType: FilterType; // Nouveau champ filtre
+  assetType: FilterType;
 }
 
 export interface Settings {
@@ -48,6 +49,15 @@ export interface MarketState {
 
 export interface WatchlistVm extends WatchlistItem, UniversalQuote {}
 
+// Interface pour nos statistiques
+export interface MarketStats {
+  topGainer: WatchlistVm | null;
+  topLoser: WatchlistVm | null;
+  avgChange: number;
+  totalCount: number;
+  distribution: { type: AssetType; count: number; pct: number; color: string }[];
+}
+
 /** ---------- Actions ---------- */
 type Action =
   | { type: '@@INIT' }
@@ -57,7 +67,7 @@ type Action =
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SET_MIN_CHANGE_PCT'; value: number | null }
   | { type: 'SET_SORT'; sortBy: SortBy; sortDir: SortDir }
-  | { type: 'SET_ASSET_TYPE'; assetType: FilterType } // Nouvelle Action
+  | { type: 'SET_ASSET_TYPE'; assetType: FilterType }
   | { type: 'SET_REFRESH_MS'; refreshMs: number }
   | { type: 'RESET' };
 
@@ -92,7 +102,7 @@ const DEFAULT_STATE: MarketState = {
   ],
   selectedSymbol: null,
   filters: { query: '', minChangePct: null, sortBy: 'addedAt', sortDir: 'desc', assetType: 'ALL' },
-  settings: { refreshMs: 15000 },
+  settings: { refreshMs: 30000 },
 };
 
 function reducer(state: MarketState, action: Action): MarketState {
@@ -120,7 +130,7 @@ function reducer(state: MarketState, action: Action): MarketState {
     case 'SET_SORT':
       return { ...state, filters: { ...state.filters, sortBy: action.sortBy, sortDir: action.sortDir } };
       
-    case 'SET_ASSET_TYPE': // Gestion de l'onglet actif
+    case 'SET_ASSET_TYPE': 
       return { ...state, filters: { ...state.filters, assetType: action.assetType } };
       
     case 'SET_REFRESH_MS':
@@ -155,7 +165,7 @@ export class MarketStore {
   readonly watchlistCount$ = this.watchlist$.pipe(map(w => w.length));
   readonly hasToken$ = this.snapshot$.pipe(map(() => true)); 
 
-  // --- LE CŒUR DU SYSTÈME (Live Feed) ---
+  // --- Live Feed ---
   readonly quotes$ = combineLatest([this.watchlist$, this.settings$]).pipe(
     switchMap(([list, settings]) => {
       const symbols = list.map(w => w.symbol);
@@ -164,7 +174,7 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // --- Vue Combinée (Watchlist + Live Data) ---
+  // --- Vue Combinée ---
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
     map(([list, quotes]) => {
       const qMap = new Map(quotes.map(q => [q.symbol, q]));
@@ -178,24 +188,56 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // --- Filtrage (Search + TABS + Sort) ---
+  // --- NOUVEAU : CALCULATEUR DE STATS ---
+  readonly stats$ = this.watchlistVm$.pipe(
+    map((items): MarketStats | null => {
+      if (!items.length) return null;
+
+      // 1. Top Winners/Losers
+      // On trie par performance
+      const sorted = [...items].sort((a, b) => b.changePct - a.changePct);
+      const topGainer = sorted[0];
+      const topLoser = sorted[sorted.length - 1];
+      
+      // 2. Moyenne
+      const avgChange = items.reduce((acc, i) => acc + i.changePct, 0) / items.length;
+
+      // 3. Distribution
+      const counts: Record<string, number> = {};
+      items.forEach(i => counts[i.type] = (counts[i.type] || 0) + 1);
+
+      const colorMap: Record<string, string> = {
+        'CRYPTO': '#8b5cf6', // Violet
+        'STOCK': '#0ea5e9',  // Bleu
+        'FOREX': '#10b981'   // Vert (ou autre)
+      };
+
+      const distribution = Object.entries(counts).map(([type, count]) => ({
+        type: type as AssetType,
+        count,
+        pct: (count / items.length) * 100,
+        color: colorMap[type] || '#64748b'
+      })).sort((a, b) => b.pct - a.pct); // Les plus gros segments d'abord
+
+      return { topGainer, topLoser, avgChange, totalCount: items.length, distribution };
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
+
+  // --- Filtrage ---
   readonly filteredWatchlistVm$ = combineLatest([this.watchlistVm$, this.filters$]).pipe(
     map(([items, f]) => {
+      // Si on est en mode STATS, on ne filtre pas la liste ici, mais le composant gérera l'affichage
+      if (f.assetType === 'STATS') return items; 
+
       let out = items;
+      if (f.assetType !== 'ALL') out = out.filter(x => x.type === f.assetType);
       
-      // 1. Filtrage par TYPE (Onglets)
-      if (f.assetType !== 'ALL') {
-        out = out.filter(x => x.type === f.assetType);
-      }
-      
-      // 2. Filtrage par texte
       const q = f.query.trim().toUpperCase();
       if (q) out = out.filter(x => x.symbol.includes(q));
       
-      // 3. Filtrage par variation min
       if (f.minChangePct) out = out.filter(x => x.changePct >= f.minChangePct!);
 
-      // 4. Tri
       const dir = f.sortDir === 'asc' ? 1 : -1;
       out = [...out].sort((a, b) => {
         let valA: any = a[f.sortBy];
@@ -212,7 +254,7 @@ export class MarketStore {
     this.state$.pipe(skip(1), tap(persistState)).subscribe();
   }
 
-  // --- API Publique ---
+  // --- API ---
   addSymbol(symbol: string) { this.actions$.next({ type: 'ADD_SYMBOL', symbol }); }
   removeSymbol(symbol: string) { this.actions$.next({ type: 'REMOVE_SYMBOL', symbol }); }
   selectSymbol(symbol: string | null) { this.actions$.next({ type: 'SELECT_SYMBOL', symbol }); }
@@ -220,15 +262,11 @@ export class MarketStore {
   setSort(sortBy: SortBy, sortDir: SortDir) { this.actions$.next({ type: 'SET_SORT', sortBy, sortDir }); }
   setMinChangePct(value: number | null) { this.actions$.next({ type: 'SET_MIN_CHANGE_PCT', value }); }
   setRefreshMs(refreshMs: number) { this.actions$.next({ type: 'SET_REFRESH_MS', refreshMs }); }
-  
-  // Nouvelle méthode pour changer d'onglet
   setAssetType(assetType: FilterType) { this.actions$.next({ type: 'SET_ASSET_TYPE', assetType }); }
-  
   reset() { this.actions$.next({ type: 'RESET' }); }
   
   private computeInitialState(): MarketState {
     const p = loadPersisted();
-    // On force 'ALL' au démarrage pour pas être perdu
     return { ...DEFAULT_STATE, ...p, filters: { ...DEFAULT_STATE.filters, assetType: 'ALL' } };
   }
 }

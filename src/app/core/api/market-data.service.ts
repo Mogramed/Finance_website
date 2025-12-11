@@ -1,19 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, merge, of, timer } from 'rxjs';
-import { switchMap, scan, shareReplay } from 'rxjs/operators';
+import { switchMap, scan, shareReplay, catchError } from 'rxjs/operators';
 import { BinanceService } from './binance.service';
 import { TwelveDataService } from './twelvedata.service';
+import { TiingoService } from './tiingo.service';
 import { UniversalQuote, getAssetType } from './market-interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class MarketDataService {
   private binance = inject(BinanceService);
   private twelveData = inject(TwelveDataService);
+  private tiingo = inject(TiingoService);
 
-  /**
-   * Surveille une liste de symboles hétérogènes (Crypto + Stock + Forex)
-   */
-  watch(symbols: string[], refreshMs = 15000): Observable<UniversalQuote[]> {
+  watch(symbols: string[], refreshMs = 30000): Observable<UniversalQuote[]> {
     if (symbols.length === 0) return of([]);
 
     const crypto = symbols.filter(s => getAssetType(s) === 'CRYPTO');
@@ -21,31 +20,46 @@ export class MarketDataService {
 
     const streams: Observable<UniversalQuote | UniversalQuote[]>[] = [];
 
-    // 1. WebSocket Crypto (Temps réel - Push)
+    // 1. WebSocket Crypto
     if (crypto.length > 0) {
       streams.push(this.binance.connect(crypto));
     }
 
-    // 2. HTTP Stock/Forex (Polling - Pull)
-    // On met un refresh plus lent (15s) pour économiser ton quota Twelve Data (800 req/jour)
+    // 2. HTTP Stock/Forex
+    // Refresh sécurisé (min 20s si beaucoup de symboles)
+    const safeRefresh = Math.max(refreshMs, others.length > 2 ? 30000 : 15000);
+
     if (others.length > 0) {
-      const poller$ = timer(0, refreshMs).pipe(
-        switchMap(() => this.twelveData.getQuotes(others))
+      const poller$ = timer(0, safeRefresh).pipe(
+        switchMap(() => this.twelveData.getQuotes(others).pipe(
+          catchError(err => {
+            console.warn('Erreur API Stocks:', err);
+            return of([]); 
+          })
+        ))
       );
       streams.push(poller$);
     }
 
-    // 3. Fusion des données
     return merge(...streams).pipe(
+      // --- C'EST ICI QUE LA MAGIE OPÈRE ---
       scan((acc, val) => {
+        // On crée une Map avec les anciennes valeurs
         const map = new Map(acc.map(q => [q.symbol, q]));
         
+        // Fonction de mise à jour sécurisée
+        const safeUpdate = (q: UniversalQuote) => {
+          // ON NE MET À JOUR QUE SI LE PRIX EST VALIDE (> 0)
+          // Si q.price est 0 ou null, on garde l'ancienne valeur dans la Map
+          if (q && q.price > 0) {
+            map.set(q.symbol, q);
+          }
+        };
+
         if (Array.isArray(val)) {
-          // Mise à jour de masse (Twelve Data)
-          val.forEach(q => map.set(q.symbol, q));
+          val.forEach(safeUpdate);
         } else {
-          // Mise à jour unitaire (Binance)
-          map.set(val.symbol, val);
+          safeUpdate(val);
         }
         
         return Array.from(map.values());
