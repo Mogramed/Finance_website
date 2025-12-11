@@ -18,14 +18,19 @@ import { MarketDataService } from '../api/market-data.service';
 import { UniversalQuote, AssetType } from '../api/market-interfaces';
 
 /** ---------- Types ---------- */
-export type SortBy = 'symbol' | 'addedAt' | 'changePct';
+export type SortBy = 'symbol' | 'addedAt' | 'changePct' | 'pnl'; // Ajout tri par PnL
 export type SortDir = 'asc' | 'desc';
-// On ajoute 'STATS' ici pour gérer l'onglet
 export type FilterType = 'ALL' | AssetType | 'STATS'; 
+
+export interface Position {
+  quantity: number;
+  avgPrice: number; // Prix moyen d'achat
+}
 
 export interface WatchlistItem {
   symbol: string;
   addedAt: number;
+  position?: Position; // NOUVEAU : On peut détenir l'actif
 }
 
 export interface Filters {
@@ -47,15 +52,25 @@ export interface MarketState {
   settings: Settings;
 }
 
-export interface WatchlistVm extends WatchlistItem, UniversalQuote {}
+// ViewModel combiné (Ce qu'on affiche)
+export interface WatchlistVm extends WatchlistItem, UniversalQuote {
+  // Champs calculés pour le portefeuille
+  holdingValue?: number; // Valeur actuelle (qty * livePrice)
+  investedValue?: number; // Montant investi (qty * avgPrice)
+  pnl?: number; // Profit/Perte en $
+  pnlPct?: number; // Profit/Perte en %
+}
 
-// Interface pour nos statistiques
 export interface MarketStats {
   topGainer: WatchlistVm | null;
   topLoser: WatchlistVm | null;
   avgChange: number;
   totalCount: number;
   distribution: { type: AssetType; count: number; pct: number; color: string }[];
+  // Stats Portefeuille
+  totalInvested: number;
+  totalValue: number;
+  totalPnl: number;
 }
 
 /** ---------- Actions ---------- */
@@ -63,6 +78,7 @@ type Action =
   | { type: '@@INIT' }
   | { type: 'ADD_SYMBOL'; symbol: string }
   | { type: 'REMOVE_SYMBOL'; symbol: string }
+  | { type: 'UPDATE_POSITION'; symbol: string; qty: number; price: number } // NOUVEAU
   | { type: 'SELECT_SYMBOL'; symbol: string | null }
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SET_MIN_CHANGE_PCT'; value: number | null }
@@ -72,7 +88,7 @@ type Action =
   | { type: 'RESET' };
 
 /** ---------- Storage Utils ---------- */
-const STORAGE_KEY = 'rmd.market.v3'; 
+const STORAGE_KEY = 'rmd.market.v4'; // V4 car changement de structure
 
 function getLocalStorage() {
   try { return typeof globalThis !== 'undefined' ? localStorage : null; } catch { return null; }
@@ -117,6 +133,20 @@ function reducer(state: MarketState, action: Action): MarketState {
       
     case 'REMOVE_SYMBOL':
       return { ...state, watchlist: state.watchlist.filter(w => w.symbol !== action.symbol) };
+
+    case 'UPDATE_POSITION': // Met à jour ou crée une position
+      return {
+        ...state,
+        watchlist: state.watchlist.map(w => {
+          if (w.symbol !== action.symbol) return w;
+          // Si quantité 0, on supprime la position mais on garde l'item en watchlist
+          if (action.qty <= 0) {
+            const { position, ...rest } = w;
+            return rest;
+          }
+          return { ...w, position: { quantity: action.qty, avgPrice: action.price } };
+        })
+      };
       
     case 'SELECT_SYMBOL':
       return { ...state, selectedSymbol: action.symbol };
@@ -174,7 +204,7 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // --- Vue Combinée ---
+  // --- Vue Combinée (Avec calculs PnL) ---
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
     map(([list, quotes]) => {
       const qMap = new Map(quotes.map(q => [q.symbol, q]));
@@ -182,52 +212,69 @@ export class MarketStore {
         const quote = qMap.get(w.symbol) ?? { 
           symbol: w.symbol, price: 0, changePct: 0, ts: Date.now(), source: 'MOCK', type: 'STOCK' 
         };
-        return { ...w, ...quote };
+
+        const vm: WatchlistVm = { ...w, ...quote };
+
+        // CALCUL PNL SI POSITION
+        if (w.position && quote.price > 0) {
+          vm.investedValue = w.position.quantity * w.position.avgPrice;
+          vm.holdingValue = w.position.quantity * quote.price;
+          vm.pnl = vm.holdingValue - vm.investedValue;
+          vm.pnlPct = (vm.pnl / vm.investedValue) * 100;
+        }
+
+        return vm;
       });
     }),
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  // --- NOUVEAU : CALCULATEUR DE STATS ---
+  // --- STATS GLOBALES ---
   readonly stats$ = this.watchlistVm$.pipe(
     map((items): MarketStats | null => {
       if (!items.length) return null;
 
-      // 1. Top Winners/Losers
-      // On trie par performance
       const sorted = [...items].sort((a, b) => b.changePct - a.changePct);
-      const topGainer = sorted[0];
-      const topLoser = sorted[sorted.length - 1];
       
-      // 2. Moyenne
-      const avgChange = items.reduce((acc, i) => acc + i.changePct, 0) / items.length;
-
-      // 3. Distribution
       const counts: Record<string, number> = {};
-      items.forEach(i => counts[i.type] = (counts[i.type] || 0) + 1);
+      let totalInvested = 0;
+      let totalValue = 0;
 
-      const colorMap: Record<string, string> = {
-        'CRYPTO': '#8b5cf6', // Violet
-        'STOCK': '#0ea5e9',  // Bleu
-        'FOREX': '#10b981'   // Vert (ou autre)
-      };
+      items.forEach(i => {
+        counts[i.type] = (counts[i.type] || 0) + 1;
+        if (i.investedValue && i.holdingValue) {
+          totalInvested += i.investedValue;
+          totalValue += i.holdingValue;
+        }
+      });
 
       const distribution = Object.entries(counts).map(([type, count]) => ({
-        type: type as AssetType,
-        count,
-        pct: (count / items.length) * 100,
-        color: colorMap[type] || '#64748b'
-      })).sort((a, b) => b.pct - a.pct); // Les plus gros segments d'abord
+        type: type as AssetType, count, pct: (count / items.length) * 100, color: this.getColor(type)
+      })).sort((a, b) => b.pct - a.pct);
 
-      return { topGainer, topLoser, avgChange, totalCount: items.length, distribution };
+      return { 
+        topGainer: sorted[0], 
+        topLoser: sorted[sorted.length - 1], 
+        avgChange: items.reduce((acc, i) => acc + i.changePct, 0) / items.length,
+        totalCount: items.length, 
+        distribution,
+        totalInvested,
+        totalValue,
+        totalPnl: totalValue - totalInvested
+      };
     }),
     shareReplay({ bufferSize: 1, refCount: true })
   );
 
+  private getColor(type: string): string {
+    if (type === 'CRYPTO') return '#8b5cf6';
+    if (type === 'STOCK') return '#0ea5e9';
+    return '#10b981';
+  }
+
   // --- Filtrage ---
   readonly filteredWatchlistVm$ = combineLatest([this.watchlistVm$, this.filters$]).pipe(
     map(([items, f]) => {
-      // Si on est en mode STATS, on ne filtre pas la liste ici, mais le composant gérera l'affichage
       if (f.assetType === 'STATS') return items; 
 
       let out = items;
@@ -240,8 +287,8 @@ export class MarketStore {
 
       const dir = f.sortDir === 'asc' ? 1 : -1;
       out = [...out].sort((a, b) => {
-        let valA: any = a[f.sortBy];
-        let valB: any = b[f.sortBy];
+        let valA: any = a[f.sortBy] ?? 0;
+        let valB: any = b[f.sortBy] ?? 0;
         if (typeof valA === 'string') return valA.localeCompare(valB) * dir;
         return (valA - valB) * dir;
       });
@@ -257,6 +304,10 @@ export class MarketStore {
   // --- API ---
   addSymbol(symbol: string) { this.actions$.next({ type: 'ADD_SYMBOL', symbol }); }
   removeSymbol(symbol: string) { this.actions$.next({ type: 'REMOVE_SYMBOL', symbol }); }
+  updatePosition(symbol: string, qty: number, price: number) { 
+    this.actions$.next({ type: 'UPDATE_POSITION', symbol, qty, price }); 
+  }
+  
   selectSymbol(symbol: string | null) { this.actions$.next({ type: 'SELECT_SYMBOL', symbol }); }
   setQuery(query: string) { this.actions$.next({ type: 'SET_QUERY', query }); }
   setSort(sortBy: SortBy, sortDir: SortDir) { this.actions$.next({ type: 'SET_SORT', sortBy, sortDir }); }

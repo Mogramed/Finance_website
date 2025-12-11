@@ -3,11 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { UniversalQuote, CompanyProfile } from './market-interfaces';
+import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class TiingoService {
   private http = inject(HttpClient);
-  private readonly apiKey = '1a237f4a00b4a7b6a855b22c071f90797b2cd545';
+  private readonly apiKey = environment.apiKeys.tiingo;;
   private readonly baseUrl = 'https://api.tiingo.com';
 
   // ... getQuote existant ...

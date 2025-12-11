@@ -323,7 +323,8 @@
 
 .item {
   display: grid; 
-  grid-template-columns: 1.8fr 1.2fr 1fr 0.8fr 40px 40px; 
+  /* On ajuste les colonnes : Sym | Prix | Chg% | PnL | Source | Delete */
+  grid-template-columns: 2fr 1.2fr 1fr 1.2fr 40px 40px; 
   align-items: center;
   padding: 1.2rem 1.5rem; 
   background: rgba(30, 41, 59, 0.3); 
@@ -383,3 +384,40 @@
     &:hover { color: #ef4444; background: rgba(239, 68, 68, 0.1); }
   }
 }
+
+/* BALANCE CARD (Nouveau) */
+.balance-card {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin-bottom: 2rem;
+  
+  .balance-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+  .label { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; color: #cbd5e1; }
+  
+  .balance-val { font-size: 3rem; font-weight: 800; color: white; font-family: var(--font-mono); text-shadow: 0 0 30px rgba(59, 130, 246, 0.3); }
+  
+  .balance-invested { font-size: 0.9rem; color: #94a3b8; font-family: var(--font-mono); margin-top: 0.5rem; }
+
+  .pnl-badge {
+    font-size: 0.9rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; font-family: var(--font-mono);
+    &.pos { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    &.neg { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+  }
+}
+
+/* POSITION INFO (Nouveau) */
+  .position-info {
+    display: flex; flex-direction: column; align-items: flex-end; cursor: pointer;
+    padding: 4px 8px; border-radius: 6px; transition: background 0.2s;
+    &:hover { background: rgba(255,255,255,0.05); }
+
+    .pnl-val { font-weight: 700; font-family: var(--font-mono); font-size: 0.95rem;
+      &.pos { color: var(--success); } &.neg { color: var(--danger); }
+    }
+    .qty-lbl { font-size: 0.75rem; color: #64748b; font-family: var(--font-mono); }
+    
+    .add-pos-btn { opacity: 0.3; transition: opacity 0.2s; font-size: 1.1rem; }
+    &:hover .add-pos-btn { opacity: 1; }
+  }

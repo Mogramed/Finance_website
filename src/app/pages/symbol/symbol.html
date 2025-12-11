@@ -17,6 +17,21 @@
   <div class="grid-layout">
     <div class="main-col">
       <div class="card chart-card">
+        <div class="chart-toolbar">
+          <div class="res-group">
+            <button 
+              *ngFor="let r of resolutions" 
+              class="res-btn" 
+              [class.active]="(resolution$ | async) === r.val"
+              (click)="setResolution(r.val)">
+              {{ r.label }}
+            </button>
+          </div>
+          <div class="chart-status">
+            <span class="dot"></span> Live
+          </div>
+        </div>
+
         <div class="chart-container" #chartContainer></div>
       </div>
 
@@ -32,15 +47,18 @@
 
     <div class="side-col">
       <div class="card news-card">
-        <h2>Dernières News</h2>
+        <h2>Actualités</h2>
         <div class="news-list" *ngIf="news$ | async as newsList; else loadingNews">
           <a *ngFor="let n of newsList" [href]="n.url" target="_blank" class="news-item">
-            <div class="news-meta">{{ n.publishedDate | date:'short' }} • {{ n.source }}</div>
-            <div class="news-title">{{ n.title }}</div>
+            <div class="news-img" *ngIf="n.image" [style.background-image]="'url(' + n.image + ')'"></div>
+            <div class="news-content">
+              <div class="news-meta">{{ n.publishedDate | date:'dd MMM' }} • {{ n.source }}</div>
+              <div class="news-title">{{ n.title }}</div>
+            </div>
           </a>
-          <div *ngIf="newsList.length === 0" class="muted">Aucune news récente.</div>
+          <div *ngIf="newsList.length === 0" class="muted">Aucune news trouvée.</div>
         </div>
-        <ng-template #loadingNews><div class="muted">Chargement des news...</div></ng-template>
+        <ng-template #loadingNews><div class="muted loader">Recherche des infos...</div></ng-template>
       </div>
     </div>
   </div>

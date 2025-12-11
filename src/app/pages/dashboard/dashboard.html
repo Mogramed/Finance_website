@@ -26,6 +26,19 @@
   <ng-container *ngIf="(activeTab$ | async) === 'STATS'">
     <div class="stats-container" *ngIf="stats$ | async as s">
       
+
+    <div class="card balance-card" *ngIf="s.totalValue > 0">
+        <div class="balance-header">
+          <span class="label">Solde Portefeuille</span>
+          <span class="pnl-badge" [class.pos]="s.totalPnl >= 0" [class.neg]="s.totalPnl < 0">
+            {{ s.totalPnl >= 0 ? '+' : '' }}{{ s.totalPnl | number:'1.2-2' }} $
+          </span>
+        </div>
+        <div class="balance-val">{{ s.totalValue | number:'1.2-2' }} $</div>
+        <div class="balance-invested">Investi : {{ s.totalInvested | number:'1.2-2' }} $</div>
+      </div>
+
+
       <div class="kpi-grid">
         <div class="stat-card win">
           <div class="lbl">🏆 Top Winner</div>
@@ -149,36 +162,39 @@
 
         <ul class="list" *ngIf="vm$ | async as items">
           <li *ngFor="let it of items" class="item">
-            <a class="sym" [routerLink]="['/symbol', it.symbol]">
-              {{ it.symbol }}
-              <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
-            </a>
+          <a class="sym" [routerLink]="['/symbol', it.symbol]">
+            {{ it.symbol }}
+            <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
+          </a>
 
-            <span class="price">
-            <ng-container *ngIf="it.price > 0; else noPrice">
-               {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
-            </ng-container>
-            <ng-template #noPrice>
-              <span class="muted" style="font-size: 0.9rem; opacity: 0.5;">—</span>
-            </ng-template>
+          <span class="price">
+             {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
           </span>
 
-            <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
-              {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
-            </span>
-            
-            <span class="time muted" title="Dernière maj">
-              {{ it.ts | date:'HH:mm:ss' }}
-            </span>
-            
-            <span class="source-badge" title="Source: {{ it.source }}">
-              {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
-            </span>
+          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
+            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
+          </span>
 
-            <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </li>
+          <div class="position-info" (click)="editPosition(it)" title="Modifier ma position">
+            <ng-container *ngIf="it.position; else noPos">
+              <span class="pnl-val" [class.pos]="(it.pnl ?? 0) >= 0" [class.neg]="(it.pnl ?? 0) < 0">
+                {{ (it.pnl ?? 0) >= 0 ? '+' : '' }}{{ it.pnl | number:'1.2-2' }} $
+              </span>
+              <span class="qty-lbl">{{ it.position.quantity }} @ {{ it.position.avgPrice }}</span>
+            </ng-container>
+            <ng-template #noPos>
+              <span class="add-pos-btn">+ 💼</span>
+            </ng-template>
+          </div>
+          
+          <span class="source-badge" title="Source: {{ it.source }}">
+            {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
+          </span>
+
+          <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </li>
         </ul>
       </div>
     </div>

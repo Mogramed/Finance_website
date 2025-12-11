@@ -38,13 +38,13 @@ export class BinanceService {
     );
   }
 
-  // NOUVEAU : Historique pour le graphique
+// MODIFICATION : interval dynamique
   getKlines(symbol: string, interval: string = '1h', limit: number = 100): Observable<Candle[]> {
     return this.http.get<any[]>(`${this.apiUrl}/klines`, {
       params: { symbol: symbol.toUpperCase(), interval, limit }
     }).pipe(
       map(data => data.map(k => ({
-        time: k[0] / 1000, // Binance envoie ms, le chart veut secondes
+        time: k[0] / 1000, 
         open: parseFloat(k[1]),
         high: parseFloat(k[2]),
         low: parseFloat(k[3]),

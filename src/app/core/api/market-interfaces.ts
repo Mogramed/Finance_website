@@ -1,4 +1,4 @@
-export type MarketSource = 'BINANCE' | 'TWELVE_DATA' | 'TIINGO' | 'MOCK';
+export type MarketSource = 'BINANCE' | 'TWELVE_DATA' | 'TIINGO' | 'ALPHA_VANTAGE' | 'FRANKFURTER' | 'MOCK';
 export type AssetType = 'CRYPTO' | 'FOREX' | 'STOCK';
 
 export interface UniversalQuote {
@@ -10,9 +10,8 @@ export interface UniversalQuote {
   type: AssetType;
 }
 
-// NOUVEAU : Pour le graphique
 export interface Candle {
-  time: number; // Unix timestamp (seconds)
+  time: number;
   open: number;
   high: number;
   low: number;
@@ -28,13 +27,13 @@ export interface CompanyProfile {
   logo?: string;
 }
 
-// ... fonction getAssetType existante ...
 export function getAssetType(symbol: string): AssetType {
   const s = symbol.toUpperCase();
   if (s.endsWith('USDT') || s.endsWith('BUSD') || ['BTC', 'ETH', 'SOL', 'XRP', 'BNB'].includes(s)) {
     return 'CRYPTO';
   }
-  if (s.includes('/') || (s.length === 6 && !/\d/.test(s) && (s.startsWith('USD') || s.endsWith('USD')))) {
+  // Forex : souvent 6 lettres (EURUSD) ou avec slash (EUR/USD)
+  if (s.includes('/') || (s.length === 6 && !/\d/.test(s) && (s.startsWith('USD') || s.endsWith('USD') || s.startsWith('EUR') || s.startsWith('GBP')))) {
     return 'FOREX';
   }
   return 'STOCK';
