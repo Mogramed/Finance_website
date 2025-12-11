@@ -23,39 +23,31 @@
     </div>
   </div>
 
-  <div class="card warn" *ngIf="(hasToken$ | async) === false">
-    <strong>Clé API manquante.</strong>
-    <div class="muted">
-      Va dans <a routerLink="/settings">Settings</a> pour coller ton token Finnhub.
-    </div>
-  </div>
-
   <div class="grid">
     <div class="card">
-  <h2>Quote (live)</h2>
+      <h2>Quote (live)</h2>
 
-  <ng-container *ngIf="quote$ | async as q; else noQuote">
-    <div class="price">
-      {{ isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}
+      <ng-container *ngIf="quote$ | async as q; else noQuote">
+        <div class="price">
+          {{ isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}
+        </div>
+
+        <div class="chg"
+             [class.pos]="isFiniteNumber(q.dp) && q.dp >= 0"
+             [class.neg]="isFiniteNumber(q.dp) && q.dp < 0">
+          {{ isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
+          <span class="muted"> ({{ isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
+        </div>
+
+        <div class="muted mini">O {{ q.o }} • H {{ q.h }} • L {{ q.l }} • Prev {{ q.pc }}</div>
+      </ng-container>
+
+      <ng-template #noQuote>
+        <div class="muted">Chargement...</div>
+      </ng-template>
     </div>
 
-    <div class="chg"
-         [class.pos]="isFiniteNumber(q.dp) && q.dp >= 0"
-         [class.neg]="isFiniteNumber(q.dp) && q.dp < 0">
-      {{ isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
-      <span class="muted"> ({{ isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
-    </div>
-
-    <div class="muted mini">O {{ q.o }} • H {{ q.h }} • L {{ q.l }} • Prev {{ q.pc }}</div>
-  </ng-container>
-
-  <ng-template #noQuote>
-    <div class="muted">Pas de quote (token manquant, rate limit, ou symbole invalide).</div>
-  </ng-template>
-</div>
-
-
-    <div class="card">
+    <div class="card wide">
       <div class="row">
         <h2>Chart</h2>
 
@@ -78,23 +70,54 @@
         </div>
       </div>
 
-      <div class="chart" *ngIf="chartVm$ | async as vm">
-        <svg viewBox="0 0 640 160" preserveAspectRatio="none">
-          <polyline *ngIf="vm.points" [attr.points]="vm.points" fill="none" stroke="currentColor" stroke-width="2" />
-        </svg>
+      <div class="chart-container" *ngIf="chartSeries$ | async as series">
+        <apx-chart
+          *ngIf="series.length > 0; else noData"
+          [series]="series"
+          [chart]="chartOptions.chart!"
+          [xaxis]="chartOptions.xaxis!"
+          [yaxis]="chartOptions.yaxis!"
+          [title]="chartOptions.title!"
+          [theme]="chartOptions.theme!"
+        ></apx-chart>
+        
+        <ng-template #noData>
+          <div class="muted" style="padding: 2rem; text-align: center;">
+            Pas de données pour cette période.
+          </div>
+        </ng-template>
+      </div>
+    </div>
 
-        <div class="muted mini">
-          points: {{ vm.n }} • min: {{ vm.min | number:'1.2-2' }} • max: {{ vm.max | number:'1.2-2' }}
+    <div class="card" *ngIf="metrics$ | async as m">
+      <h2>Key Statistics</h2>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="label">Market Cap (M)</span>
+          <span class="value">{{ m.metric.marketCapitalization | number:'1.0-0' }} $</span>
         </div>
-
-        <div class="muted" *ngIf="!vm.points">Pas de données (no_data) ou trop peu de points.</div>
+        <div class="stat-item">
+          <span class="label">P/E Ratio</span>
+          <span class="value">{{ m.metric.peRatio | number:'1.2-2' }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Div. Yield</span>
+          <span class="value text-green">{{ m.metric.dividendYield | number:'1.2-2' }}%</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">52W High</span>
+          <span class="value">{{ m.metric['52WeekHigh'] | number:'1.2-2' }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="label">Beta</span>
+          <span class="value">{{ m.metric.beta | number:'1.2-2' }}</span>
+        </div>
       </div>
     </div>
 
     <div class="card wide">
       <h2>News</h2>
-
-      <div class="muted" *ngIf="(news$ | async)?.length === 0">Pas de news.</div>
+      <div class="muted" *ngIf="(news$ | async)?.length === 0">Pas de news récentes.</div>
 
       <div class="news" *ngIf="news$ | async as items">
         <a class="news-item" *ngFor="let it of items" [href]="it.url" target="_blank" rel="noopener">
@@ -103,7 +126,6 @@
             <span class="pill2">{{ it.source }}</span>
             <span class="muted">{{ (it.datetime * 1000) | date:'medium' }}</span>
           </div>
-          <div class="muted sum">{{ it.summary }}</div>
         </a>
       </div>
     </div>

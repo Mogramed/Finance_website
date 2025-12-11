@@ -45,24 +45,23 @@ export class FinnhubService {
   // Connection au serveur Python local
   private readonly baseUrl = 'http://127.0.0.1:5000'; 
 
-  // NOTE: On accepte token?: string (undefined) ou null pour éviter les erreurs de compilation
-  quote(symbol: string, token?: string | null): Observable<Quote> {
+  quote(symbol: string, token?: string): Observable<Quote> {
     return this.http.get<Quote>(`${this.baseUrl}/quote`, { params: { symbol } });
   }
 
-  profile2(symbol: string, token?: string | null): Observable<FinnhubCompanyProfile2> {
+  profile2(symbol: string, token?: string): Observable<FinnhubCompanyProfile2> {
     return this.http.get<FinnhubCompanyProfile2>(`${this.baseUrl}/stock/profile2`, { params: { symbol } });
   }
 
-  search(q: string, token?: string | null): Observable<FinnhubSearchResponse> {
+  search(q: string, token?: string): Observable<FinnhubSearchResponse> {
     return this.http.get<FinnhubSearchResponse>(`${this.baseUrl}/search`, { params: { q } });
   }
 
-  companyNews(symbol: string, from: string, to: string, token?: string | null): Observable<FinnhubCompanyNewsItem[]> {
+  companyNews(symbol: string, from: string, to: string, token?: string): Observable<FinnhubCompanyNewsItem[]> {
     return this.http.get<FinnhubCompanyNewsItem[]>(`${this.baseUrl}/company-news`, { params: { symbol } });
   }
 
-  candles(symbol: string, resolution: string, from: number, to: number, token?: string | null): Observable<StockCandle> {
+  candles(symbol: string, resolution: string, from: number, to: number, token?: string): Observable<StockCandle> {
     return this.http.get<StockCandle>(`${this.baseUrl}/stock/candle`, {
       params: { symbol, resolution, from: from.toString(), to: to.toString() }
     });
