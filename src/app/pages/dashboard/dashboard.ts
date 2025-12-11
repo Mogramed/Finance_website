@@ -4,13 +4,14 @@ import { RouterLink } from '@angular/router';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
-  combineLatest, debounceTime, distinctUntilChanged, map,
-  of, shareReplay, startWith, switchMap, timer
+  debounceTime,
+  distinctUntilChanged,
+  map,
+  startWith,
+  switchMap,
 } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-
-import { MarketStore, SortBy, SortDir } from '../../core/store/market.store';
-import { FinnhubService, FinnhubSearchResult } from '../../core/api/finnhub.service';
+import { MarketStore, FilterType } from '../../core/store/market.store';
+import { TwelveDataService } from '../../core/api/twelvedata.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -20,47 +21,61 @@ import { FinnhubService, FinnhubSearchResult } from '../../core/api/finnhub.serv
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
-  private readonly store = inject(MarketStore);
-  private readonly finnhub = inject(FinnhubService);
+  readonly store = inject(MarketStore); // 'protected' n'est pas nécessaire si on utilise readonly sans modificateur en TS strict parfois, mais readonly suffit ici
+  private readonly twelveData = inject(TwelveDataService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly vm$ = this.store.filteredWatchlistVm$;
   readonly count$ = this.store.watchlistCount$;
+  readonly hasToken$ = this.store.hasToken$;
+  
+  // Pour savoir quel onglet est actif (Observable)
+  readonly activeTab$ = this.store.filters$.pipe(map(f => f.assetType));
 
-  // --- NOUVEAU : GLOBAL MARKETS (Refresh toutes les 30s) ---
-  readonly marketOverview$ = timer(0, 30000).pipe(
-    switchMap(() => this.finnhub.getMarketOverview().pipe(catchError(() => of([])))),
-    shareReplay({ bufferSize: 1, refCount: true })
-  );
-
-  // Form Controls
   readonly queryCtrl = new FormControl('', { nonNullable: true });
   readonly minChangeCtrl = new FormControl<number | null>(null);
-  readonly sortByCtrl = new FormControl<SortBy>('addedAt', { nonNullable: true });
-  readonly sortDirCtrl = new FormControl<SortDir>('desc', { nonNullable: true });
+  readonly sortByCtrl = new FormControl('addedAt', { nonNullable: true });
+  readonly sortDirCtrl = new FormControl('desc', { nonNullable: true });
   readonly addCtrl = new FormControl('', { nonNullable: true });
 
-  // Auto-complete Search
   readonly addSuggestions$ = this.addCtrl.valueChanges.pipe(
-    startWith(''),
     debounceTime(300),
     distinctUntilChanged(),
-    switchMap((val) => {
-      const q = val.trim();
-      if (q.length < 1) return of([]);
-      return this.finnhub.search(q).pipe(
-        map((r) => (r.result ?? []).slice(0, 5)),
-        catchError(() => of([]))
-      );
-    })
+    switchMap((val) => this.twelveData.search(val))
   );
 
   constructor() {
-    // Connexion des filtres au Store
-    this.queryCtrl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(v => this.store.setQuery(v));
-    this.minChangeCtrl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(v => this.store.setMinChangePct(v));
-    this.sortByCtrl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(v => this.store.setSort(v, this.sortDirCtrl.value));
-    this.sortDirCtrl.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(v => this.store.setSort(this.sortByCtrl.value, v));
+    this.queryCtrl.valueChanges.pipe(
+      startWith(this.queryCtrl.value),
+      debounceTime(200),
+      map((v) => v.trim().toUpperCase()),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((q) => this.store.setQuery(q));
+
+    this.minChangeCtrl.valueChanges.pipe(
+      startWith(this.minChangeCtrl.value),
+      debounceTime(200),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((v) => this.store.setMinChangePct(v ?? null));
+
+    this.sortByCtrl.valueChanges.pipe(
+      startWith(this.sortByCtrl.value as any),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((v) => this.store.setSort(v as any, this.sortDirCtrl.value as any));
+
+    this.sortDirCtrl.valueChanges.pipe(
+      startWith(this.sortDirCtrl.value as any),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((v) => this.store.setSort(this.sortByCtrl.value as any, v as any));
+  }
+  
+  // Méthode pour changer l'onglet
+  setTab(type: FilterType) {
+    this.store.setAssetType(type);
   }
 
   add() {
@@ -71,12 +86,14 @@ export class Dashboard {
     }
   }
 
-  pickSuggestion(sym: string) {
-    this.store.addSymbol(sym);
+  pickSuggestion(symbol: string) {
+    this.store.addSymbol(symbol);
     this.addCtrl.setValue('');
   }
 
-  remove(sym: string) {
-    this.store.removeSymbol(sym);
+  reset() {
+    if (confirm('Tout remettre à zéro ?')) {
+      this.store.reset();
+    }
   }
 }

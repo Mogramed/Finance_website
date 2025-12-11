@@ -1,116 +1,116 @@
-<div class="dashboard-container">
-  
-  <header class="toolbar">
-    <div class="search-group">
-      <div class="input-icon">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input 
-          type="text" 
-          [formControl]="queryCtrl" 
-          placeholder="Filtrer ma liste..." 
-          class="inp-glass"
-        >
-      </div>
+<section class="page">
+  <div class="head">
+    <div>
+      <h1>Market Dashboard</h1>
+      <p class="muted">
+        Suivi temps réel : <span style="color:var(--crypto-color)">Crypto</span> & <span style="color:var(--stock-color)">Stocks</span>
+      </p>
     </div>
 
-    <div class="actions">
-      <div class="add-group">
-        <input 
-          type="text" 
-          [formControl]="addCtrl" 
-          placeholder="Ajouter (ex: NVDA)" 
-          class="inp-glass"
-        >
-        <button class="btn-add" (click)="add()">+</button>
-        
-        <div class="suggestions" *ngIf="(addSuggestions$ | async) as sugs">
-          <div *ngIf="sugs.length > 0 && addCtrl.value.length > 0">
-            <div 
-              class="sug-item" 
-              *ngFor="let s of sugs" 
-              (click)="pickSuggestion(s.symbol)"
-            >
-              <strong>{{ s.symbol }}</strong>
-              <span class="desc">{{ s.description }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="head-actions">
+      <div class="pill">{{ (count$ | async) ?? 0 }} actifs</div>
+      <button class="btn" type="button" (click)="reset()">Reset All</button>
     </div>
-  </header>
-
-  <div class="dashboard-grid">
-    
-    <section class="panel watchlist-panel">
-      <div class="panel-head">
-        <h2>Ma Watchlist <span class="badge">{{ count$ | async }}</span></h2>
-        
-        <div class="filters">
-          <select [formControl]="sortByCtrl" class="select-glass">
-            <option value="addedAt">Date d'ajout</option>
-            <option value="symbol">Symbole</option>
-            <option value="changePct">Performance</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="list-content">
-        <div 
-          class="stock-row" 
-          *ngFor="let item of vm$ | async" 
-          [routerLink]="['/symbol', item.symbol]"
-        >
-          <div class="col-sym">
-            <div class="sym">{{ item.symbol }}</div>
-            <div class="time">Ajouté il y a 1h</div>
-          </div>
-          
-          <div class="col-price">
-            {{ item.price | number:'1.2-2' }}
-          </div>
-          
-          <div class="col-chg">
-            <span class="badge-chg" 
-              [class.pos]="item.changePct >= 0" 
-              [class.neg]="item.changePct < 0">
-              {{ item.changePct > 0 ? '+' : ''}}{{ item.changePct | number:'1.2-2' }}%
-            </span>
-          </div>
-
-          <div class="col-act">
-            <button class="btn-icon danger" (click)="$event.stopPropagation(); remove(item.symbol)">×</button>
-          </div>
-        </div>
-
-        <div class="empty-state" *ngIf="(count$ | async) === 0">
-          Votre liste est vide. Recherchez une action ci-dessus.
-        </div>
-      </div>
-    </section>
-
-    <section class="panel market-panel">
-      <div class="panel-head">
-        <h2>Global Markets</h2>
-        <div class="live-ind"><span class="blink">●</span> Live</div>
-      </div>
-
-      <div class="market-grid" *ngIf="marketOverview$ | async as markets; else loadingMarkets">
-        <div class="market-card" *ngFor="let m of markets">
-          <div class="m-head">
-            <span class="m-name">{{ m.name }}</span>
-            <span class="m-sym">{{ m.symbol }}</span>
-          </div>
-          <div class="m-price">{{ m.price | number:'1.2-2' }}</div>
-          <div class="m-change" [class.pos]="m.changePercent >= 0" [class.neg]="m.changePercent < 0">
-            {{ m.changePercent > 0 ? '+' : ''}}{{ m.changePercent | number:'1.2-2' }}%
-          </div>
-        </div>
-      </div>
-
-      <ng-template #loadingMarkets>
-        <div class="loading">Chargement des indices...</div>
-      </ng-template>
-
-    </section>
   </div>
-</div>
+  
+  <div class="tabs" *ngIf="activeTab$ | async as active">
+    <button class="tab-btn" [class.active]="active === 'ALL'" (click)="setTab('ALL')">Global</button>
+    <button class="tab-btn" [class.active]="active === 'CRYPTO'" (click)="setTab('CRYPTO')">Cryptos</button>
+    <button class="tab-btn" [class.active]="active === 'STOCK'" (click)="setTab('STOCK')">Stocks & ETF</button>
+    <button class="tab-btn" [class.active]="active === 'FOREX'" (click)="setTab('FOREX')">Forex</button>
+  </div>
+
+  <div class="card controls">
+    <div class="row">
+      <label>
+        <span class="lbl">Rechercher</span>
+        <input class="inp" [formControl]="queryCtrl" placeholder="ex: BTC..." />
+      </label>
+
+      <label>
+        <span class="lbl">Min Variation %</span>
+        <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="0.00" />
+      </label>
+
+      <label>
+        <span class="lbl">Trier par</span>
+        <select class="inp" [formControl]="sortByCtrl">
+          <option value="addedAt">Récents</option>
+          <option value="symbol">Symbole (A-Z)</option>
+          <option value="changePct">Performance</option>
+        </select>
+      </label>
+
+      <label>
+        <span class="lbl">Ordre</span>
+        <select class="inp" [formControl]="sortDirCtrl">
+          <option value="desc">Descendant ⬇</option>
+          <option value="asc">Ascendant ⬆</option>
+        </select>
+      </label>
+    </div>
+
+    <hr />
+
+    <div class="add-row">
+      <label class="grow relative">
+        <span class="lbl">Ajouter un actif</span>
+        <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="ex: BTCUSDT, AAPL..." />
+
+        <div class="suggestions" *ngIf="addSuggestions$ | async as s">
+          <button
+            class="suggestion"
+            *ngFor="let it of s"
+            type="button"
+            (click)="pickSuggestion(it.symbol)"
+          >
+            <strong>{{ it.symbol }}</strong>
+            <span class="muted">{{ it.description }}</span>
+          </button>
+        </div>
+      </label>
+
+      <button class="btn" type="button" (click)="add()">Ajouter +</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card fill-h">
+      <h2 *ngIf="activeTab$ | async as active">
+        {{ active === 'ALL' ? 'Vue Globale' : '' }}
+        {{ active === 'CRYPTO' ? 'Portefeuille Crypto' : '' }}
+        {{ active === 'STOCK' ? 'Actions & ETFs' : '' }}
+        {{ active === 'FOREX' ? 'Marché des Devises' : '' }}
+      </h2>
+
+      <div class="muted" style="text-align:center; margin-top: 2rem;" *ngIf="(vm$ | async)?.length === 0">
+        Aucun actif dans cette catégorie.
+      </div>
+
+      <ul class="list" *ngIf="vm$ | async as items">
+        <li *ngFor="let it of items" class="item">
+          <a class="sym" [routerLink]="['/symbol', it.symbol]">
+            {{ it.symbol }}
+            <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
+          </a>
+
+          <span class="price">
+             {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
+          </span>
+
+          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
+            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
+          </span>
+          
+          <span class="source-badge" title="Source: {{ it.source }}">
+            {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
+          </span>
+
+          <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>

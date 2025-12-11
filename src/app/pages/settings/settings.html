@@ -1,24 +1,20 @@
 <section class="page">
   <h1>Settings</h1>
   <p class="muted">
-    Le token et le refresh alimentent des flux RxJS (ex: refreshMs$ → switchMap(timer)).
+    Configuration globale de l'application.
   </p>
 
   <div class="card">
     <div class="row">
       <label class="grow">
-        <span class="lbl">Finnhub API Token</span>
-        <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici (ne pas commit)" />
-      </label>
-
-      <label>
-        <span class="lbl">Refresh (ms)</span>
+        <span class="lbl">Refresh Interval (Stocks/Forex) en ms</span>
         <input class="inp" type="number" [formControl]="refreshCtrl" />
+        <small class="muted">Les cryptos sont en temps réel (WebSocket), ceci affecte uniquement les actions.</small>
       </label>
     </div>
 
     <div class="muted mini" *ngIf="settings$ | async as s">
-      refreshMs = {{ s.refreshMs }} • token = {{ s.apiToken ? '✅ set' : '—' }}
+      refreshMs = {{ s.refreshMs }}
     </div>
   </div>
 </section>
