@@ -1,44 +1,57 @@
-/* Importation des polices Google : Inter (Texte) et JetBrains Mono (Chiffres) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap');
 
 :root {
-  --bg-dark: #0f172a;
-  --bg-card: rgba(30, 41, 59, 0.7); /* Transparence pour l'effet Glass */
+  /* Fond plus sombre et uni pour éviter le bruit visuel */
+  --bg-dark: #0b0f19;
+  
+  /* Cartes quasi-opaques pour mieux détacher le texte */
+  --bg-card: #151e32; 
+  
   --primary: #3b82f6;
-  --accent-green: #10b981; /* Vert Néon */
-  --accent-red: #ef4444;   /* Rouge Vif */
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --border-color: rgba(148, 163, 184, 0.1);
+  --accent-green: #22c55e; /* Plus lumineux */
+  --accent-red: #ef4444;
+  
+  /* Blanc pur pour le texte principal */
+  --text-main: #ffffff;
+  
+  /* Gris très clair pour le texte secondaire (au lieu de gris foncé) */
+  --text-muted: #cbd5e1; 
+  
+  --border-color: rgba(255, 255, 255, 0.1);
 }
 
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  /* Fond dégradé subtil */
-  background: radial-gradient(circle at top left, #1e293b, #0f172a 80%);
+  background-color: var(--bg-dark);
+  /* Dégradé très subtil uniquement en haut */
+  background-image: linear-gradient(to bottom, #111827, #0b0f19 400px);
   color: var(--text-main);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased; /* Rend le texte plus net */
 }
 
-/* Scrollbar moderne */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 5px; border: 2px solid #0f172a; }
 
-/* Styles globaux pour les boutons */
 .btn {
   background: var(--primary);
   color: white;
   border: none;
-  padding: 0.6rem 1.2rem;
+  padding: 0.7rem 1.4rem; /* Un peu plus grand */
   border-radius: 8px;
   font-weight: 600;
+  font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s;
   
-  &:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  &:hover { filter: brightness(1.2); }
   
-  &.ghost { background: rgba(255,255,255,0.1); }
-  &.danger { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+  &.ghost { 
+    background: rgba(255,255,255,0.1); 
+    border: 1px solid rgba(255,255,255,0.2); /* Bordure pour mieux voir le bouton */
+  }
+  &.danger { background: rgba(220, 38, 38, 0.2); color: #fca5a5; border: 1px solid rgba(220, 38, 38, 0.3); }
 }

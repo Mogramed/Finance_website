@@ -57,7 +57,7 @@ export class Symbol {
     title: { text: "", align: "left" },
     xaxis: { 
       type: "datetime",
-      labels: { style: { colors: '#94a3b8' } }, // Texte gris clair
+      labels: { style: { colors: '#e2e8f0' } }, // Texte gris clair
       axisBorder: { show: false },
       axisTicks: { show: false }
     },
