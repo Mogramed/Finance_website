@@ -101,32 +101,40 @@ export class Dashboard {
   private readonly now$ = timer(0, 1000).pipe(shareReplay({ bufferSize: 1, refCount: false }));
 
   readonly rows$ = combineLatest([this.vm$, this.now$]).pipe(
-    map(([rows]) => {
-      const now = Date.now();
-      return rows.map((r) => {
-        const hasPrice = isFiniteNumber(r.price);
-        const hasChg = isFiniteNumber(r.changePct);
+  map(([rows]) => {
+    const now = Date.now();
+    return rows.map((r) => {
+      const hasPrice = isFiniteNumber(r.price);
+      const hasChg = isFiniteNumber(r.changePct);
+      const STALE_MS = 15 * 60_000; // 15 minutes
+      const priceDisplay = hasPrice ? r.price.toFixed(2) : '—';
+      const chgVal = hasChg ? r.changePct : 0;
+      const chgDisplay = hasChg ? `${chgVal >= 0 ? '+' : ''}${chgVal.toFixed(2)}%` : '—';
 
-        const priceDisplay = hasPrice ? r.price.toFixed(2) : '—';
-        const chgVal = hasChg ? r.changePct : 0;
-        const chgDisplay = hasChg ? `${chgVal >= 0 ? '+' : ''}${chgVal.toFixed(2)}%` : '—';
+      const ts = isFiniteNumber(r.ts) ? r.ts : now;
+      const age = now - ts;
 
-        const ts = isFiniteNumber(r.ts) ? r.ts : now;
-        const age = now - ts;
+      const isStale = age > STALE_MS;
+      let updatedLabel = formatAgo(age);
+      if (isStale) {
+        updatedLabel += ' • marché probablement fermé';
+      }
 
-        return {
-          ...r,
-          priceDisplay,
-          chgDisplay,
-          updatedLabel: formatAgo(age),
-          isUp: hasChg && chgVal > 0,
-          isDown: hasChg && chgVal < 0,
-          isStale: age > 30_000,
-        } satisfies UiRow;
-      });
-    }),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
+      return {
+        ...r,
+        priceDisplay,
+        chgDisplay,
+        updatedLabel,
+        isUp: hasChg && chgVal > 0,
+        isDown: hasChg && chgVal < 0,
+        isStale,
+      } satisfies UiRow;
+    });
+  }),
+  shareReplay({ bufferSize: 1, refCount: false })
+);
+
+  
 
   // Typeahead Finnhub
   readonly suggestions$ = combineLatest([

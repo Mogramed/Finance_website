@@ -374,14 +374,31 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: false })
   );
 
-  /** ------------------ Quotes “finales” (ws ou poll) ------------------ */
-  readonly quotes$ = combineLatest([this.liveMode$, this.wsEnabled$]).pipe(
-    switchMap(([mode, wsEnabled]) => {
-      if (mode === 'ws' && wsEnabled) return this.wsQuotes$;
-      return this.restQuotes$; // poll ou token absent => REST/mock
-    }),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
+/** ------------------ Quotes “finales” (ws ou poll) ------------------ */
+readonly quotes$ = combineLatest([
+  this.liveMode$,
+  this.wsEnabled$,
+  this.restQuotes$, // baseline via /quote
+  this.wsQuotes$,   // overrides temps réel via WS
+]).pipe(
+  map(([mode, wsEnabled, restQuotes, wsQuotes]) => {
+    // Si pas en mode WS (ou pas de token) → on reste full REST
+    if (!(mode === 'ws' && wsEnabled)) {
+      return restQuotes;
+    }
+
+    // En mode WS : REST comme base, WS par-dessus quand on a un prix valide
+    const byWs = new Map(wsQuotes.map((q) => [q.symbol, q]));
+
+    return restQuotes.map((base) => {
+      const ws = byWs.get(base.symbol);
+      if (!ws) return base;
+      if (!Number.isFinite(ws.price)) return base; // WS n’a rien pour l’instant
+      return ws; // on a un vrai dernier trade → on override
+    });
+  }),
+  shareReplay({ bufferSize: 1, refCount: false })
+);
 
   /** Join watchlist + quotes => VM */
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
@@ -463,4 +480,3 @@ export class MarketStore {
     };
   }
 }
-  
