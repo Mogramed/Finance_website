@@ -12,7 +12,7 @@
 
   h1 { 
     margin: 0; 
-    font-size: 2.2rem; /* Plus gros */
+    font-size: 2.2rem;
     font-weight: 700;
     display: flex; 
     align-items: center; 
@@ -31,7 +31,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Colonnes plus larges */
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 1.5rem;
 }
 
@@ -40,7 +40,7 @@
   border-radius: 12px;
   padding: 1.5rem;
   border: 1px solid var(--border-color);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); /* Ombre plus marquée pour détacher la carte */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
   
   &.wide { grid-column: 1 / -1; }
 
@@ -49,7 +49,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: var(--text-muted); /* Gris clair */
+    color: var(--text-muted);
     margin-top: 0;
     margin-bottom: 1.2rem;
     border-bottom: 1px solid var(--border-color);
@@ -59,105 +59,74 @@
 
 .price { 
   font-family: 'JetBrains Mono', monospace;
-  font-size: 3.8rem; 
-  font-weight: 700; 
-  color: white;
-  line-height: 1;
-  margin-bottom: 0.5rem;
+  font-size: 3.8rem; font-weight: 700; color: white; line-height: 1; margin-bottom: 0.5rem;
 }
 
 .chg { 
   font-family: 'JetBrains Mono', monospace;
-  font-size: 1.3rem; 
-  font-weight: 700;
-  display: inline-block;
-  padding: 0.3rem 0.8rem;
-  border-radius: 6px;
-  
-  /* Fond plus sombre pour augmenter le contraste du texte coloré */
+  font-size: 1.3rem; font-weight: 700; display: inline-block; padding: 0.3rem 0.8rem; border-radius: 6px;
   &.pos { color: #4ade80; background: rgba(22, 101, 52, 0.3); } 
   &.neg { color: #f87171; background: rgba(153, 27, 27, 0.3); }
 }
 
-.controls {
-  display: flex;
-  gap: 1rem;
-}
+.controls { display: flex; gap: 1rem; }
 
 .inp {
-  background: #0f172a; /* Fond noir pour l'input */
-  border: 1px solid #334155;
-  color: white;
-  padding: 0.6rem 1rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-family: 'Inter', sans-serif;
-  
+  background: #0f172a; border: 1px solid #334155; color: white; padding: 0.6rem 1rem; border-radius: 6px; font-size: 1rem; font-family: 'Inter', sans-serif;
   &:focus { border-color: var(--primary); outline: 2px solid rgba(59, 130, 246, 0.3); }
 }
 
-/* Grille Statistiques */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 1rem;
 
   .stat-item {
-    background: rgba(255, 255, 255, 0.03);
-    padding: 1rem;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.05);
-
-    .label { 
-      font-size: 0.85rem; 
-      color: #94a3b8; /* Gris moyen pour le label */
-      text-transform: uppercase; 
-      font-weight: 600;
-      margin-bottom: 0.4rem; 
-      display: block;
-    }
-    .value { 
-      font-family: 'JetBrains Mono', monospace; 
-      font-size: 1.2rem; 
-      font-weight: 500;
-      color: white; /* Blanc pur pour la valeur */
-    }
+    background: rgba(255, 255, 255, 0.03); padding: 1rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);
+    .label { font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: 0.4rem; display: block; }
+    .value { font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; font-weight: 500; color: white; }
     .text-green { color: #4ade80; }
   }
 }
 
-.news-item {
-  display: block; 
-  padding: 1.2rem; 
-  background: rgba(255,255,255,0.02);
-  border-radius: 8px;
-  margin-bottom: 0.8rem;
-  text-decoration: none; 
-  color: inherit;
-  transition: background 0.2s;
-  
-  &:hover { background: rgba(255,255,255,0.06); }
-  
-  .ttl { 
-    font-weight: 600; 
-    margin-bottom: 0.5rem; 
-    font-size: 1.1rem; 
-    color: #e2e8f0; 
+/* NOUVEAU STYLE POUR LA GRILLE DE NEWS */
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.news-card {
+  display: flex; flex-direction: column;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none; color: inherit;
+  transition: transform 0.2s, background 0.2s;
+  height: 100%;
+
+  &:hover {
+    transform: translateY(-4px); background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.1);
   }
-  .meta { 
-    font-size: 0.9rem; 
-    display: flex; 
-    align-items: center;
-    gap: 1rem; 
-    color: #94a3b8; 
+
+  .news-img {
+    height: 140px; width: 100%; overflow: hidden; background: #000;
+    img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; transition: opacity 0.3s; }
   }
-  .pill2 { 
-    background: #1e293b; 
-    color: var(--primary); 
-    padding: 0.2rem 0.6rem; 
-    border-radius: 4px; 
-    font-weight: bold;
-    border: 1px solid rgba(59, 130, 246, 0.2);
+  &:hover .news-img img { opacity: 1; }
+
+  .news-content { padding: 1rem; display: flex; flex-direction: column; flex: 1; }
+
+  .news-meta {
+    display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem; text-transform: uppercase; font-weight: 600;
+    .source { color: var(--primary); }
+  }
+
+  .headline {
+    font-size: 1rem; font-weight: 600; line-height: 1.4; margin: 0; color: #e2e8f0;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
   }
 }
 

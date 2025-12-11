@@ -1,4 +1,4 @@
-/* Variables pour le glassmorphism */
+/* Variables */
 :host {
   --glass-bg: rgba(30, 41, 59, 0.4);
   --glass-border: 1px solid rgba(255, 255, 255, 0.08);
@@ -8,33 +8,17 @@
 }
 
 .dashboard-container {
-  padding: 0 1rem;
-  max-width: 1600px;
-  margin: 0 auto;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  padding: 0 1rem; max-width: 1600px; margin: 0 auto; height: 100%; display: flex; flex-direction: column;
 }
 
-/* --- TOOLBAR --- */
+/* Toolbar */
 .toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 0;
-  margin-bottom: 1rem;
+  display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 0; margin-bottom: 1rem;
 }
 
 .inp-glass {
-  background: rgba(15, 23, 42, 0.6);
-  border: var(--glass-border);
-  color: white;
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
-  outline: none;
-  font-family: inherit;
-  width: 250px;
-  transition: all 0.2s;
+  background: rgba(15, 23, 42, 0.6); border: var(--glass-border); color: white; padding: 0.6rem 1rem; border-radius: 8px;
+  outline: none; font-family: inherit; width: 250px; transition: all 0.2s;
   &:focus { border-color: var(--accent); background: rgba(15, 23, 42, 0.9); }
 }
 
@@ -46,7 +30,6 @@
 
 .add-group {
   display: flex; gap: 0.5rem; position: relative;
-  
   .btn-add {
     background: var(--accent); color: white; border: none; width: 40px; border-radius: 8px; font-size: 1.2rem; cursor: pointer;
     &:hover { filter: brightness(1.1); }
@@ -54,65 +37,41 @@
 }
 
 .suggestions {
-  position: absolute; top: 100%; left: 0; right: 0;
-  background: #1e293b; border: var(--glass-border); border-radius: 8px;
-  margin-top: 5px; z-index: 50; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+  position: absolute; top: 105%; left: 0; right: 0; background: #1e293b; border: 1px solid rgba(255,255,255,0.1); 
+  border-radius: 8px; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-height: 300px; overflow-y: auto;
 
   .sug-item {
-    padding: 0.8rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
-    &:hover { background: var(--accent); }
-    strong { display: block; font-size: 0.9rem; }
-    .desc { font-size: 0.75rem; opacity: 0.7; }
+    padding: 0.8rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 2px;
+    &:hover { background: #334155; }
+    .sug-row { display: flex; justify-content: space-between; align-items: center; strong { color: white; font-size: 0.95rem; } }
+    .desc { font-size: 0.8rem; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge-exch { font-size: 0.65rem; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 1px 4px; border-radius: 4px; }
+    .muted-small { font-size: 0.7rem; color: #64748b; }
   }
 }
 
-/* --- GRID LAYOUT --- */
+/* Grid Layout */
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr; /* Watchlist large (2/3), Indices (1/3) */
-  gap: 1.5rem;
-  flex: 1;
-  min-height: 0; /* Important pour le scroll */
+  display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; flex: 1; min-height: 0; padding-bottom: 2rem;
 }
 
 .panel {
-  background: var(--glass-bg);
-  border: var(--glass-border);
-  border-radius: 12px;
-  display: flex; flex-direction: column;
-  overflow: hidden;
+  background: var(--glass-bg); border: var(--glass-border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
 }
 
 .panel-head {
-  padding: 1rem 1.5rem;
-  border-bottom: var(--glass-border);
-  display: flex; justify-content: space-between; align-items: center;
-  background: rgba(0,0,0,0.2);
-
+  padding: 1rem 1.5rem; border-bottom: var(--glass-border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);
   h2 { margin: 0; font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; color: #e2e8f0; }
   .badge { background: #334155; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; }
 }
 
-/* --- WATCHLIST --- */
-.list-content {
-  overflow-y: auto;
-  flex: 1;
-  padding: 0.5rem;
-}
+/* Watchlist */
+.list-content { overflow-y: auto; flex: 1; padding: 0.5rem; }
 
 .stock-row {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 40px;
-  align-items: center;
-  padding: 1rem;
-  margin-bottom: 0.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  text-decoration: none; color: inherit;
-
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr 40px; align-items: center; padding: 1rem; margin-bottom: 0.5rem; border-radius: 8px;
+  cursor: pointer; transition: background 0.2s; text-decoration: none; color: inherit;
   &:hover { background: rgba(255,255,255,0.03); transform: translateX(2px); }
-
   .sym { font-weight: 700; color: white; font-size: 1rem; }
   .time { font-size: 0.75rem; color: #64748b; }
   .col-price { font-family: 'JetBrains Mono', monospace; font-weight: 600; text-align: right; padding-right: 1rem; }
@@ -124,44 +83,53 @@
     &.neg { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
   }
   
-  .btn-icon {
-    background: transparent; border: none; color: #64748b; font-size: 1.2rem; cursor: pointer;
-    &:hover { color: var(--danger); }
-  }
+  .btn-icon { background: transparent; border: none; color: #64748b; font-size: 1.2rem; cursor: pointer; &:hover { color: var(--danger); } }
 }
 
-/* --- MARKET OVERVIEW (NOUVEAU) --- */
+/* Right Column */
+.right-col { display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; }
+
+.market-panel { flex: 0 0 auto; max-height: 400px; }
+
 .live-ind { font-size: 0.75rem; color: var(--success); display: flex; align-items: center; gap: 5px; }
 .blink { animation: blink 2s infinite; }
-
 @keyframes blink { 50% { opacity: 0.3; } }
 
-.market-grid {
-  padding: 1rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1rem;
-  overflow-y: auto;
-}
+.market-grid { padding: 1rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; overflow-y: auto; }
 
 .market-card {
-  background: rgba(0,0,0,0.3);
-  border: var(--glass-border);
-  padding: 1rem;
-  border-radius: 10px;
-  display: flex; flex-direction: column;
-  gap: 0.5rem;
-
+  background: rgba(0,0,0,0.3); border: var(--glass-border); padding: 1rem; border-radius: 10px; display: flex; flex-direction: column; gap: 0.5rem;
   .m-head { display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; }
   .m-sym { font-weight: 700; color: #475569; }
-  
   .m-price { font-family: 'JetBrains Mono'; font-size: 1.1rem; color: white; font-weight: 600; }
-  
-  .m-change {
-    font-size: 0.85rem; font-weight: 600;
-    &.pos { color: var(--success); }
-    &.neg { color: var(--danger); }
-  }
+  .m-change { font-size: 0.85rem; font-weight: 600; &.pos { color: var(--success); } &.neg { color: var(--danger); } }
 }
 
-.loading, .empty-state { padding: 2rem; text-align: center; color: #64748b; font-size: 0.9rem; }
+/* ANALYTICS PANEL (NOUVEAU STYLE) */
+.analytics-panel {
+  flex: 1; min-height: 300px; display: flex; flex-direction: column; overflow: hidden;
+
+  .native-chart { flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
+
+  .bar-row { display: flex; align-items: center; gap: 1rem; height: 24px; }
+
+  .bar-label { width: 50px; font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-align: right; }
+
+  .bar-track {
+    flex: 1; height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden; position: relative;
+  }
+
+  .bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.5s ease-out, background-color 0.3s; min-width: 2px;
+    &.pos { background: var(--success); box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
+    &.neg { background: var(--danger); box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+  }
+
+  .bar-value {
+    width: 60px; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; text-align: right; font-weight: 600;
+    &.pos-txt { color: var(--success); }
+    &.neg-txt { color: var(--danger); }
+  }
+
+  .empty-state-small, .loading, .empty-state { padding: 2rem; text-align: center; color: #64748b; font-size: 0.9rem; }
+}

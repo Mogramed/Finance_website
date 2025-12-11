@@ -116,15 +116,24 @@
     </div>
 
     <div class="card wide">
-      <h2>News</h2>
-      <div class="muted" *ngIf="(news$ | async)?.length === 0">Pas de news récentes.</div>
+      <h2>Dernières Actualités</h2>
+      
+      <div class="muted" *ngIf="(news$ | async)?.length === 0" style="padding: 1rem;">
+        Aucune news récente disponible pour ce titre.
+      </div>
 
-      <div class="news" *ngIf="news$ | async as items">
-        <a class="news-item" *ngFor="let it of items" [href]="it.url" target="_blank" rel="noopener">
-          <div class="ttl">{{ it.headline }}</div>
-          <div class="meta">
-            <span class="pill2">{{ it.source }}</span>
-            <span class="muted">{{ (it.datetime * 1000) | date:'medium' }}</span>
+      <div class="news-grid" *ngIf="news$ | async as items">
+        <a class="news-card" *ngFor="let it of items" [href]="it.url" target="_blank" rel="noopener">
+          <div class="news-img" *ngIf="it.image">
+            <img [src]="it.image" alt="news thumb" loading="lazy">
+          </div>
+          
+          <div class="news-content">
+            <div class="news-meta">
+              <span class="source">{{ it.source }}</span>
+              <span class="date">{{ (it.datetime * 1000) | date:'short' }}</span>
+            </div>
+            <h3 class="headline">{{ it.headline }}</h3>
           </div>
         </a>
       </div>

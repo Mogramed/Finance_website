@@ -4,34 +4,24 @@
     <div class="search-group">
       <div class="input-icon">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input 
-          type="text" 
-          [formControl]="queryCtrl" 
-          placeholder="Filtrer ma liste..." 
-          class="inp-glass"
-        >
+        <input type="text" [formControl]="queryCtrl" placeholder="Filtrer ma liste..." class="inp-glass">
       </div>
     </div>
 
     <div class="actions">
       <div class="add-group">
-        <input 
-          type="text" 
-          [formControl]="addCtrl" 
-          placeholder="Ajouter (ex: NVDA)" 
-          class="inp-glass"
-        >
+        <input type="text" [formControl]="addCtrl" placeholder="Ajouter (ex: Airbus)" class="inp-glass">
         <button class="btn-add" (click)="add()">+</button>
         
         <div class="suggestions" *ngIf="(addSuggestions$ | async) as sugs">
-          <div *ngIf="sugs.length > 0 && addCtrl.value.length > 0">
-            <div 
-              class="sug-item" 
-              *ngFor="let s of sugs" 
-              (click)="pickSuggestion(s.symbol)"
-            >
-              <strong>{{ s.symbol }}</strong>
+          <div *ngIf="sugs.length > 0 && addCtrl.value.length >= 2">
+            <div class="sug-item" *ngFor="let s of sugs" (click)="pickSuggestion(s.symbol)">
+              <div class="sug-row">
+                <strong>{{ s.symbol }}</strong>
+                <span class="badge-exch">{{ s.type }}</span>
+              </div>
               <span class="desc">{{ s.description }}</span>
+              <span class="muted-small">{{ s.exchange }}</span>
             </div>
           </div>
         </div>
@@ -40,11 +30,9 @@
   </header>
 
   <div class="dashboard-grid">
-    
     <section class="panel watchlist-panel">
       <div class="panel-head">
         <h2>Ma Watchlist <span class="badge">{{ count$ | async }}</span></h2>
-        
         <div class="filters">
           <select [formControl]="sortByCtrl" class="select-glass">
             <option value="addedAt">Date d'ajout</option>
@@ -53,64 +41,87 @@
           </select>
         </div>
       </div>
-
       <div class="list-content">
         <div 
           class="stock-row" 
-          *ngFor="let item of vm$ | async" 
+          *ngFor="let item of vm$ | async; trackBy: trackBySymbol" 
           [routerLink]="['/symbol', item.symbol]"
         >
           <div class="col-sym">
             <div class="sym">{{ item.symbol }}</div>
-            <div class="time">Ajouté il y a 1h</div>
+            <div class="time">Live</div>
           </div>
-          
-          <div class="col-price">
-            {{ item.price | number:'1.2-2' }}
-          </div>
-          
+          <div class="col-price">{{ item.price | number:'1.2-2' }}</div>
           <div class="col-chg">
-            <span class="badge-chg" 
-              [class.pos]="item.changePct >= 0" 
-              [class.neg]="item.changePct < 0">
+            <span class="badge-chg" [class.pos]="item.changePct >= 0" [class.neg]="item.changePct < 0">
               {{ item.changePct > 0 ? '+' : ''}}{{ item.changePct | number:'1.2-2' }}%
             </span>
           </div>
-
           <div class="col-act">
             <button class="btn-icon danger" (click)="$event.stopPropagation(); remove(item.symbol)">×</button>
           </div>
         </div>
-
         <div class="empty-state" *ngIf="(count$ | async) === 0">
-          Votre liste est vide. Recherchez une action ci-dessus.
+          Votre liste est vide.
         </div>
       </div>
     </section>
 
-    <section class="panel market-panel">
-      <div class="panel-head">
-        <h2>Global Markets</h2>
-        <div class="live-ind"><span class="blink">●</span> Live</div>
-      </div>
-
-      <div class="market-grid" *ngIf="marketOverview$ | async as markets; else loadingMarkets">
-        <div class="market-card" *ngFor="let m of markets">
-          <div class="m-head">
-            <span class="m-name">{{ m.name }}</span>
-            <span class="m-sym">{{ m.symbol }}</span>
-          </div>
-          <div class="m-price">{{ m.price | number:'1.2-2' }}</div>
-          <div class="m-change" [class.pos]="m.changePercent >= 0" [class.neg]="m.changePercent < 0">
-            {{ m.changePercent > 0 ? '+' : ''}}{{ m.changePercent | number:'1.2-2' }}%
+    <div class="right-col">
+      
+      <section class="panel market-panel">
+        <div class="panel-head">
+          <h2>Global Markets</h2>
+          <div class="live-ind"><span class="blink">●</span> Live</div>
+        </div>
+        <div class="market-grid" *ngIf="marketOverview$ | async as markets; else loadingMarkets">
+          <div class="market-card" *ngFor="let m of markets; trackBy: trackBySymbol">
+            <div class="m-head">
+              <span class="m-name">{{ m.name }}</span>
+              <span class="m-sym">{{ m.symbol }}</span>
+            </div>
+            <div class="m-price">{{ m.price | number:'1.2-2' }}</div>
+            <div class="m-change" [class.pos]="m.changePercent >= 0" [class.neg]="m.changePercent < 0">
+              {{ m.changePercent > 0 ? '+' : ''}}{{ m.changePercent | number:'1.2-2' }}%
+            </div>
           </div>
         </div>
-      </div>
+        <ng-template #loadingMarkets>
+          <div class="loading">Chargement...</div>
+        </ng-template>
+      </section>
 
-      <ng-template #loadingMarkets>
-        <div class="loading">Chargement des indices...</div>
-      </ng-template>
+      <section class="panel analytics-panel">
+        <div class="panel-head">
+          <h2>Performance du Jour</h2>
+        </div>
+        
+        <div class="native-chart" *ngIf="(count$ | async)! > 0; else emptyChart">
+          <div class="bar-row" *ngFor="let item of topPerformers; trackBy: trackBySymbol">
+            
+            <div class="bar-label">{{ item.symbol }}</div>
+            
+            <div class="bar-track">
+              <div class="bar-fill" 
+                   [style.width.%]="(item.changePct < 0 ? (item.changePct * -1) : item.changePct) / maxAbsChange * 100"
+                   [class.pos]="item.changePct >= 0"
+                   [class.neg]="item.changePct < 0">
+              </div>
+            </div>
 
-    </section>
+            <div class="bar-value" 
+                 [class.pos-txt]="item.changePct >= 0"
+                 [class.neg-txt]="item.changePct < 0">
+              {{ item.changePct > 0 ? '+' : ''}}{{ item.changePct | number:'1.2-2' }}%
+            </div>
+          </div>
+        </div>
+
+        <ng-template #emptyChart>
+          <div class="empty-state-small">Ajoutez des actions pour voir le comparatif.</div>
+        </ng-template>
+      </section>
+
+    </div>
   </div>
 </div>

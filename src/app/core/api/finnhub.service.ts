@@ -26,11 +26,15 @@ export interface FinnhubSearchResponse {
   result: FinnhubSearchResult[];
 }
 
+// C'est ici qu'il manquait la propriété 'exchange' 👇
 export interface FinnhubSearchResult {
-  description: string; displaySymbol: string; symbol: string; type: string;
+  description: string; 
+  displaySymbol: string; 
+  symbol: string; 
+  type: string;
+  exchange: string; // <--- AJOUTÉ
 }
 
-// Interface pour les stats fondamentales
 export interface FinnhubMetrics {
   metric: {
     "10DayAverageTradingVolume": number;
@@ -44,7 +48,6 @@ export interface FinnhubMetrics {
   };
 }
 
-// Interface pour le Market Overview (Indices globaux)
 export interface MarketItem {
   symbol: string;
   name: string;
@@ -62,8 +65,6 @@ export class FinnhubService {
   private http = inject(HttpClient);
   // Connection au serveur Python local
   private readonly baseUrl = 'http://127.0.0.1:5000'; 
-
-  // --- METHODES ---
 
   quote(symbol: string, token?: string | null): Observable<Quote> {
     return this.http.get<Quote>(`${this.baseUrl}/quote`, { params: { symbol } });
@@ -93,7 +94,6 @@ export class FinnhubService {
     });
   }
 
-  // C'est cette méthode qui posait problème (elle doit être DANS la classe)
   getMarketOverview(): Observable<MarketItem[]> {
     return this.http.get<MarketItem[]>(`${this.baseUrl}/market/overview`);
   }
