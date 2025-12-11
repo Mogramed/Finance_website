@@ -155,8 +155,13 @@
             </a>
 
             <span class="price">
-              {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
-            </span>
+            <ng-container *ngIf="it.price > 0; else noPrice">
+               {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
+            </ng-container>
+            <ng-template #noPrice>
+              <span class="muted" style="font-size: 0.9rem; opacity: 0.5;">—</span>
+            </ng-template>
+          </span>
 
             <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
               {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%

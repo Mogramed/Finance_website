@@ -31,7 +31,8 @@ export class TwelveDataService {
           ts: Date.now(), 
           source: 'TWELVE_DATA',
           type: item.symbol.includes('/') ? 'FOREX' : 'STOCK'
-        } as UniversalQuote));
+        } as UniversalQuote))
+        .filter(q => q.price > 0 && !isNaN(q.price)); 
       }),
       catchError(err => {
         console.warn('TwelveData Error:', err);
