@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, DestroyRef, inject } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { debounceTime, distinctUntilChanged, map, startWith } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { debounceTime, distinctUntilChanged, startWith } from 'rxjs';
 import { MarketStore } from '../../core/store/market.store';
 
 @Component({
@@ -16,35 +16,22 @@ export class Settings {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly settings$ = this.store.settings$;
-
-  readonly tokenCtrl = new FormControl('', { nonNullable: true });
-  readonly refreshCtrl = new FormControl<number>(1500, { nonNullable: true });
+  
+  // Juste le refresh rate
+  readonly refreshCtrl = new FormControl(15000, { nonNullable: true });
 
   constructor() {
-    this.settings$
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((s) => {
-        this.tokenCtrl.setValue(s.apiToken ?? '', { emitEvent: false });
-        this.refreshCtrl.setValue(s.refreshMs, { emitEvent: false });
-      });
+    // Initialisation
+    this.settings$.pipe(takeUntilDestroyed()).subscribe(s => {
+      this.refreshCtrl.setValue(s.refreshMs, { emitEvent: false });
+    });
 
-    this.tokenCtrl.valueChanges
-      .pipe(
-        startWith(this.tokenCtrl.value),
-        debounceTime(250),
-        map((v) => v.trim() || null),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe((tok) => this.store.setApiToken(tok));
-
-    this.refreshCtrl.valueChanges
-      .pipe(
-        startWith(this.refreshCtrl.value),
-        debounceTime(150),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe((ms) => this.store.setRefreshMs(Math.max(500, ms)));
+    // Sauvegarde auto
+    this.refreshCtrl.valueChanges.pipe(
+      startWith(this.refreshCtrl.value),
+      debounceTime(500),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((val) => this.store.setRefreshMs(val));
   }
 }

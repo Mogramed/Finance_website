@@ -1,103 +1,181 @@
 <section class="page">
   <div class="head">
     <div>
-      <h1>Dashboard</h1>
+      <h1>Market Dashboard</h1>
       <p class="muted">
-        Finnhub REST (/quote) + Store RxJS central (combineLatest / switchMap / forkJoin / retry / shareReplay).
+        Suivi temps réel : <span style="color:var(--crypto-color)">Crypto</span> & <span style="color:var(--stock-color)">Stocks</span>
       </p>
     </div>
 
     <div class="head-actions">
-      <span class="pill">watchlist: {{ (count$ | async) ?? 0 }}</span>
-      <button class="btn" type="button" (click)="reset()">Reset</button>
+      <div class="pill">{{ (count$ | async) ?? 0 }} actifs</div>
+      <button class="btn" type="button" (click)="reset()">Reset All</button>
     </div>
   </div>
-
-  <div class="card warn" *ngIf="(hasToken$ | async) === false">
-    <strong>Clé API manquante</strong>
-    <div class="muted">
-      Va dans <a routerLink="/settings">Settings</a> pour coller ton token (sinon fallback mock).
-    </div>
+  
+  <div class="tabs" *ngIf="activeTab$ | async as active">
+    <button class="tab-btn" [class.active]="active === 'ALL'" (click)="setTab('ALL')">Global</button>
+    <button class="tab-btn" [class.active]="active === 'CRYPTO'" (click)="setTab('CRYPTO')">Cryptos</button>
+    <button class="tab-btn" [class.active]="active === 'STOCK'" (click)="setTab('STOCK')">Stocks</button>
+    <button class="tab-btn" [class.active]="active === 'FOREX'" (click)="setTab('FOREX')">Forex</button>
+    <button class="tab-btn stats-tab" [class.active]="active === 'STATS'" (click)="setTab('STATS')">
+      📊 Stats & Perf
+    </button>
   </div>
 
-  <div class="card controls">
-    <div class="row">
-      <label>
-        <span class="lbl">Recherche</span>
-        <input class="inp" [formControl]="queryCtrl" placeholder="AAPL, TSLA, MSFT..." />
-      </label>
-
-      <label>
-        <span class="lbl">Min change %</span>
-        <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="ex: 0.5" />
-      </label>
-
-      <label>
-        <span class="lbl">Tri</span>
-        <select class="inp" [formControl]="sortByCtrl">
-          <option value="addedAt">Ajout</option>
-          <option value="symbol">Symbole</option>
-          <option value="changePct">Variation %</option>
-        </select>
-      </label>
-
-      <label>
-        <span class="lbl">Sens</span>
-        <select class="inp" [formControl]="sortDirCtrl">
-          <option value="desc">Desc</option>
-          <option value="asc">Asc</option>
-        </select>
-      </label>
-    </div>
-
-    <div class="row addrow">
-      <label class="grow">
-        <span class="lbl">Ajouter (typeahead Finnhub)</span>
-        <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="ex: NVDA" />
-
-        <div class="suggestions" *ngIf="addSuggestions$ | async as s">
-          <button
-            class="suggestion"
-            *ngFor="let it of s"
-            type="button"
-            (click)="pickSuggestion(it.symbol)"
-          >
-            <strong>{{ it.symbol }}</strong>
-            <span class="muted">— {{ it.description }}</span>
-          </button>
+  <ng-container *ngIf="(activeTab$ | async) === 'STATS'">
+    <div class="stats-container" *ngIf="stats$ | async as s">
+      
+      <div class="kpi-grid">
+        <div class="stat-card win">
+          <div class="lbl">🏆 Top Winner</div>
+          <div class="val" *ngIf="s.topGainer">
+            {{ s.topGainer.symbol }}
+            <span class="pct">+{{ s.topGainer.changePct | number:'1.2-2' }}%</span>
+          </div>
+          <div class="sub" *ngIf="s.topGainer">{{ s.topGainer.price | number:'1.2-5' }} $</div>
+          <div class="muted" *ngIf="!s.topGainer">—</div>
         </div>
-      </label>
 
-      <button class="btn" type="button" (click)="add()">Add</button>
-    </div>
-  </div>
+        <div class="stat-card loss">
+          <div class="lbl">📉 Top Loser</div>
+          <div class="val" *ngIf="s.topLoser">
+            {{ s.topLoser.symbol }}
+            <span class="pct">{{ s.topLoser.changePct | number:'1.2-2' }}%</span>
+          </div>
+          <div class="sub" *ngIf="s.topLoser">{{ s.topLoser.price | number:'1.2-5' }} $</div>
+          <div class="muted" *ngIf="!s.topLoser">—</div>
+        </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>Watchlist (live)</h2>
-
-      <div class="muted" *ngIf="(vm$ | async)?.length === 0">
-        Rien (ajoute un symbole).
+        <div class="stat-card avg">
+          <div class="lbl">⚖️ Moyenne Globale</div>
+          <div class="val" [class.pos]="s.avgChange >= 0" [class.neg]="s.avgChange < 0">
+            {{ s.avgChange > 0 ? '+' : ''}}{{ s.avgChange | number:'1.2-2' }}%
+          </div>
+          <div class="sub">Sur {{ s.totalCount }} actifs</div>
+        </div>
       </div>
 
-      <ul class="list" *ngIf="vm$ | async as items">
-        <li *ngFor="let it of items" class="item">
-          <a class="sym" [routerLink]="['/symbol', it.symbol]">{{ it.symbol }}</a>
+      <div class="card distribution-card">
+        <h2>Allocation du Portefeuille</h2>
+        <div class="dist-bar">
+          <div 
+            class="segment" 
+            *ngFor="let d of s.distribution" 
+            [style.width.%]="d.pct" 
+            [style.background]="d.color"
+            [title]="d.type + ': ' + (d.pct | number:'1.0-1') + '%'"
+          ></div>
+        </div>
+        <div class="dist-legend">
+          <div class="leg-item" *ngFor="let d of s.distribution">
+            <span class="dot" [style.background]="d.color"></span>
+            <span class="type">{{ d.type }}</span>
+            <span class="count">{{ d.count }} ({{ d.pct | number:'1.0-0' }}%)</span>
+          </div>
+        </div>
+      </div>
 
-          <span class="price">{{ it.price | number:'1.2-2' }}</span>
+    </div>
+  </ng-container>
 
-          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
-            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
-          </span>
+  <ng-container *ngIf="(activeTab$ | async) !== 'STATS'">
+    <div class="card controls">
+      <div class="row">
+        <label>
+          <span class="lbl">Rechercher</span>
+          <input class="inp" [formControl]="queryCtrl" placeholder="ex: BTC..." />
+        </label>
 
-          <button class="icon-btn" type="button" (click)="remove(it.symbol)">✕</button>
-        </li>
-      </ul>
+        <label>
+          <span class="lbl">Min Variation %</span>
+          <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="0.00" />
+        </label>
+
+        <label>
+          <span class="lbl">Trier par</span>
+          <select class="inp" [formControl]="sortByCtrl">
+            <option value="addedAt">Récents</option>
+            <option value="symbol">Symbole (A-Z)</option>
+            <option value="changePct">Performance</option>
+          </select>
+        </label>
+
+        <label>
+          <span class="lbl">Ordre</span>
+          <select class="inp" [formControl]="sortDirCtrl">
+            <option value="desc">Descendant ⬇</option>
+            <option value="asc">Ascendant ⬆</option>
+          </select>
+        </label>
+      </div>
+
+      <hr />
+
+      <div class="add-row">
+        <label class="grow relative">
+          <span class="lbl">Ajouter un actif</span>
+          <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="Tapez un symbole (ex: AAPL, ETHUSDT)..." />
+
+          <div class="suggestions" *ngIf="addSuggestions$ | async as s">
+            <button
+              class="suggestion"
+              *ngFor="let it of s"
+              type="button"
+              (click)="pickSuggestion(it.symbol)"
+            >
+              <strong>{{ it.symbol }}</strong>
+              <span class="muted">{{ it.description }}</span>
+            </button>
+          </div>
+        </label>
+
+        <button class="btn" type="button" (click)="add()">Ajouter +</button>
+      </div>
     </div>
 
-    <div class="card">
-      <h2>State (debug)</h2>
-      <pre class="pre">{{ stateJson$ | async }}</pre>
+    <div class="grid">
+      <div class="card fill-h">
+        <h2 *ngIf="activeTab$ | async as active">
+          {{ active === 'ALL' ? 'Vue Globale' : '' }}
+          {{ active === 'CRYPTO' ? 'Portefeuille Crypto' : '' }}
+          {{ active === 'STOCK' ? 'Actions & ETFs' : '' }}
+          {{ active === 'FOREX' ? 'Marché des Devises' : '' }}
+        </h2>
+
+        <div class="muted" style="text-align:center; margin-top: 2rem;" *ngIf="(vm$ | async)?.length === 0">
+          Aucun actif dans cette catégorie.
+        </div>
+
+        <ul class="list" *ngIf="vm$ | async as items">
+          <li *ngFor="let it of items" class="item">
+            <a class="sym" [routerLink]="['/symbol', it.symbol]">
+              {{ it.symbol }}
+              <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
+            </a>
+
+            <span class="price">
+              {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
+            </span>
+
+            <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
+              {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
+            </span>
+            
+            <span class="time muted" title="Dernière maj">
+              {{ it.ts | date:'HH:mm:ss' }}
+            </span>
+            
+            <span class="source-badge" title="Source: {{ it.source }}">
+              {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
+            </span>
+
+            <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </li>
+        </ul>
+      </div>
     </div>
-  </div>
+  </ng-container>
 </section>

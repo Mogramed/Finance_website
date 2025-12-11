@@ -5,27 +5,23 @@ import {
   Subject,
   combineLatest,
   distinctUntilChanged,
-  forkJoin,
   map,
-  of,
   scan,
   shareReplay,
   skip,
   startWith,
   switchMap,
-  tap,
-  timer,
-  withLatestFrom,
-  exhaustMap,
+  tap
 } from 'rxjs';
-import { catchError, retry } from 'rxjs/operators';
-import { FinnhubService } from '../api/finnhub.service';
 
+import { MarketDataService } from '../api/market-data.service';
+import { UniversalQuote, AssetType } from '../api/market-interfaces';
 
 /** ---------- Types ---------- */
-
 export type SortBy = 'symbol' | 'addedAt' | 'changePct';
 export type SortDir = 'asc' | 'desc';
+// On ajoute 'STATS' ici pour gérer l'onglet
+export type FilterType = 'ALL' | AssetType | 'STATS'; 
 
 export interface WatchlistItem {
   symbol: string;
@@ -37,10 +33,10 @@ export interface Filters {
   minChangePct: number | null;
   sortBy: SortBy;
   sortDir: SortDir;
+  assetType: FilterType;
 }
 
 export interface Settings {
-  apiToken: string | null;
   refreshMs: number;
 }
 
@@ -51,17 +47,18 @@ export interface MarketState {
   settings: Settings;
 }
 
-export interface QuoteVm {
-  symbol: string;
-  price: number;
-  changePct: number;
-  ts: number;
+export interface WatchlistVm extends WatchlistItem, UniversalQuote {}
+
+// Interface pour nos statistiques
+export interface MarketStats {
+  topGainer: WatchlistVm | null;
+  topLoser: WatchlistVm | null;
+  avgChange: number;
+  totalCount: number;
+  distribution: { type: AssetType; count: number; pct: number; color: string }[];
 }
 
-export interface WatchlistVm extends WatchlistItem, QuoteVm {}
-
-/** ---------- Actions (Subject) ---------- */
-
+/** ---------- Actions ---------- */
 type Action =
   | { type: '@@INIT' }
   | { type: 'ADD_SYMBOL'; symbol: string }
@@ -70,350 +67,206 @@ type Action =
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SET_MIN_CHANGE_PCT'; value: number | null }
   | { type: 'SET_SORT'; sortBy: SortBy; sortDir: SortDir }
+  | { type: 'SET_ASSET_TYPE'; assetType: FilterType }
   | { type: 'SET_REFRESH_MS'; refreshMs: number }
-  | { type: 'SET_API_TOKEN'; apiToken: string | null }
   | { type: 'RESET' };
 
-/** ---------- Storage ---------- */
+/** ---------- Storage Utils ---------- */
+const STORAGE_KEY = 'rmd.market.v3'; 
 
-const STORAGE_KEY = 'rmd.market.v1';
-function getLocalStorage(): Storage | null {
-  try {
-    // SSR: globalThis existe, mais localStorage non
-    return typeof globalThis !== 'undefined' && 'localStorage' in globalThis
-      ? (globalThis as any).localStorage as Storage
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-
-function safeParse<T>(raw: string | null): T | null {
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-function isValidSymbol(s: unknown): s is string {
-  return typeof s === 'string' && /^[A-Z0-9.\-]{1,12}$/.test(s);
+function getLocalStorage() {
+  try { return typeof globalThis !== 'undefined' ? localStorage : null; } catch { return null; }
 }
 
 function loadPersisted(): Partial<MarketState> {
   const ls = getLocalStorage();
-  if (!ls) return {}; // SSR: pas de localStorage
-
-  const parsed = safeParse<Partial<MarketState>>(ls.getItem(STORAGE_KEY));
-  if (!parsed) return {};
-
-  const watchlistRaw = Array.isArray(parsed.watchlist) ? parsed.watchlist : [];
-  const watchlist: WatchlistItem[] = watchlistRaw
-    .map((x: any) => ({
-      symbol: String(x?.symbol ?? '').toUpperCase(),
-      addedAt: Number(x?.addedAt ?? Date.now()),
-    }))
-    .filter((x) => isValidSymbol(x.symbol) && Number.isFinite(x.addedAt));
-
-  const settings = parsed.settings ?? undefined;
-  const refreshMs =
-    typeof settings?.refreshMs === 'number' && settings.refreshMs >= 500 ? settings.refreshMs : undefined;
-
-  const apiToken = typeof settings?.apiToken === 'string' ? settings.apiToken : null;
-
-  return {
-    watchlist,
-    settings: {
-      apiToken,
-      refreshMs: refreshMs ?? 1500,
-    },
-  };
+  if (!ls) return {};
+  try {
+    const parsed = JSON.parse(ls.getItem(STORAGE_KEY) || '{}');
+    return parsed;
+  } catch { return {}; }
 }
 
 function persistState(s: MarketState) {
   const ls = getLocalStorage();
-  if (!ls) return; // SSR: pas de localStorage
-
-  const payload: Partial<MarketState> = {
-    watchlist: s.watchlist,
-    settings: s.settings,
-  };
-  ls.setItem(STORAGE_KEY, JSON.stringify(payload));
+  if (ls) ls.setItem(STORAGE_KEY, JSON.stringify({ watchlist: s.watchlist, settings: s.settings }));
 }
 
 /** ---------- Reducer ---------- */
-
 const DEFAULT_STATE: MarketState = {
   watchlist: [
-    { symbol: 'AAPL', addedAt: Date.now() - 1000 * 60 * 60 },
-    { symbol: 'MSFT', addedAt: Date.now() - 1000 * 60 * 45 },
-    { symbol: 'TSLA', addedAt: Date.now() - 1000 * 60 * 30 },
+    { symbol: 'BTCUSDT', addedAt: Date.now() },
+    { symbol: 'ETHUSDT', addedAt: Date.now() },
+    { symbol: 'AAPL', addedAt: Date.now() },
+    { symbol: 'EUR/USD', addedAt: Date.now() }
   ],
   selectedSymbol: null,
-  filters: {
-    query: '',
-    minChangePct: null,
-    sortBy: 'addedAt',
-    sortDir: 'desc',
-  },
-  settings: {
-    apiToken: null,
-    refreshMs: 1500,
-  },
+  filters: { query: '', minChangePct: null, sortBy: 'addedAt', sortDir: 'desc', assetType: 'ALL' },
+  settings: { refreshMs: 30000 },
 };
-
-function normalizeSymbol(s: string): string {
-  return s.trim().toUpperCase();
-}
 
 function reducer(state: MarketState, action: Action): MarketState {
   switch (action.type) {
-    case '@@INIT':
-      return state;
-
-    case 'RESET':
-      return DEFAULT_STATE;
-
-    case 'ADD_SYMBOL': {
-      const symbol = normalizeSymbol(action.symbol);
-      if (!isValidSymbol(symbol)) return state;
-      if (state.watchlist.some((w) => w.symbol === symbol)) return state;
-
-      const next: WatchlistItem = { symbol, addedAt: Date.now() };
-      return { ...state, watchlist: [next, ...state.watchlist] };
-    }
-
-    case 'REMOVE_SYMBOL': {
-      const symbol = normalizeSymbol(action.symbol);
-      const next = state.watchlist.filter((w) => w.symbol !== symbol);
-      const selectedSymbol = state.selectedSymbol === symbol ? null : state.selectedSymbol;
-      return { ...state, watchlist: next, selectedSymbol };
-    }
-
+    case '@@INIT': return state;
+    case 'RESET': return DEFAULT_STATE;
+    
+    case 'ADD_SYMBOL':
+      const s = action.symbol.trim().toUpperCase();
+      if (state.watchlist.some(w => w.symbol === s)) return state;
+      return { ...state, watchlist: [{ symbol: s, addedAt: Date.now() }, ...state.watchlist] };
+      
+    case 'REMOVE_SYMBOL':
+      return { ...state, watchlist: state.watchlist.filter(w => w.symbol !== action.symbol) };
+      
     case 'SELECT_SYMBOL':
       return { ...state, selectedSymbol: action.symbol };
-
+      
     case 'SET_QUERY':
       return { ...state, filters: { ...state.filters, query: action.query } };
-
+      
     case 'SET_MIN_CHANGE_PCT':
       return { ...state, filters: { ...state.filters, minChangePct: action.value } };
-
+      
     case 'SET_SORT':
       return { ...state, filters: { ...state.filters, sortBy: action.sortBy, sortDir: action.sortDir } };
-
+      
+    case 'SET_ASSET_TYPE': 
+      return { ...state, filters: { ...state.filters, assetType: action.assetType } };
+      
     case 'SET_REFRESH_MS':
       return { ...state, settings: { ...state.settings, refreshMs: action.refreshMs } };
-
-    case 'SET_API_TOKEN':
-      return { ...state, settings: { ...state.settings, apiToken: action.apiToken } };
-
-    default:
-      return state;
+      
+    default: return state;
   }
-}
-
-/** ---------- Mock quote generator (fallback si pas de token) ---------- */
-
-function hashString(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function mockQuote(symbol: string, tick: number): QuoteVm {
-  const h = hashString(symbol);
-  const base = 80 + (h % 220);
-  const wave1 = Math.sin((tick + (h % 10)) / 3) * 2.0;
-  const wave2 = Math.sin(tick / 1.7 + (h % 100)) * 0.6;
-  const price = Math.max(1, base + wave1 + wave2);
-
-  const changePct = ((price - base) / base) * 100;
-  return {
-    symbol,
-    price: Math.round(price * 100) / 100,
-    changePct: Math.round(changePct * 100) / 100,
-    ts: Date.now(),
-  };
 }
 
 /** ---------- Store ---------- */
-
 @Injectable({ providedIn: 'root' })
 export class MarketStore {
-  private readonly finnhub = inject(FinnhubService);
-
-  /** Subject = bus d’actions */
+  private readonly marketData = inject(MarketDataService);
+  
   private readonly actions$ = new Subject<Action>();
-
-  /** BehaviorSubject = snapshot courant */
   private readonly snapshotSubject = new BehaviorSubject<MarketState>(this.computeInitialState());
+  
   readonly snapshot$ = this.snapshotSubject.asObservable();
 
-  /** Observable d’état (scan = reducer RxJS) */
-  readonly state$: Observable<MarketState> = this.actions$.pipe(
+  readonly state$ = this.actions$.pipe(
     startWith({ type: '@@INIT' } as Action),
     scan((s, a) => reducer(s, a), this.snapshotSubject.value),
-    tap((s) => this.snapshotSubject.next(s)),
+    tap(s => this.snapshotSubject.next(s)),
     shareReplay({ bufferSize: 1, refCount: false })
   );
 
-  /** Selectors (flux dérivés) */
-  readonly watchlist$ = this.snapshot$.pipe(
-    map((s) => s.watchlist),
-    distinctUntilChanged(),
-    shareReplay({ bufferSize: 1, refCount: false })
+  // --- Selectors ---
+  readonly watchlist$ = this.snapshot$.pipe(map(s => s.watchlist), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
+  readonly settings$ = this.snapshot$.pipe(map(s => s.settings), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
+  readonly filters$ = this.snapshot$.pipe(map(s => s.filters), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
+  
+  readonly watchlistCount$ = this.watchlist$.pipe(map(w => w.length));
+  readonly hasToken$ = this.snapshot$.pipe(map(() => true)); 
+
+  // --- Live Feed ---
+  readonly quotes$ = combineLatest([this.watchlist$, this.settings$]).pipe(
+    switchMap(([list, settings]) => {
+      const symbols = list.map(w => w.symbol);
+      return this.marketData.watch(symbols, settings.refreshMs);
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  readonly selectedSymbol$ = this.snapshot$.pipe(
-    map((s) => s.selectedSymbol),
-    distinctUntilChanged(),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
-
-  readonly filters$ = this.snapshot$.pipe(
-    map((s) => s.filters),
-    distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
-
-  readonly settings$ = this.snapshot$.pipe(
-    map((s) => s.settings),
-    distinctUntilChanged((a, b) => a.apiToken === b.apiToken && a.refreshMs === b.refreshMs),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
-
-  readonly apiToken$ = this.settings$.pipe(
-    map((s) => s.apiToken),
-    distinctUntilChanged(),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
-
-  readonly hasToken$ = this.apiToken$.pipe(map((t) => !!t));
-
-  readonly watchlistCount$ = this.watchlist$.pipe(map((w) => w.length));
-
-  /** Tick “live” dépendant de refreshMs (switchMap) */
-  readonly liveTick$ = this.settings$.pipe(
-    map((x) => x.refreshMs),
-    distinctUntilChanged(),
-    switchMap((ms) => timer(0, ms)),
-    shareReplay({ bufferSize: 1, refCount: false })
-  );
-
-  /** Quotes live: Finnhub si token, sinon fallback mock */
-  readonly quotes$ = combineLatest([this.liveTick$, this.watchlist$, this.apiToken$]).pipe(
-  exhaustMap(([tick, list, token]) => {
-    if (!token) {
-      return of(list.map((w) => mockQuote(w.symbol, Number(tick))));
-    }
-    if (list.length === 0) return of([]);
-
-    return forkJoin(
-      list.map((w) =>
-        this.finnhub.quote(w.symbol, token).pipe(
-          retry({ count: 2, delay: (_err, retryCount) => timer(250 * retryCount) }),
-          map((q) => ({
-            symbol: w.symbol,
-            price: q.c,
-            changePct: q.dp,
-            ts: q.t ? q.t * 1000 : Date.now(),
-          })),
-          catchError(() =>
-            of({ symbol: w.symbol, price: Number.NaN, changePct: 0, ts: Date.now() })
-          )
-        )
-      )
-    );
-  }),
-  shareReplay({ bufferSize: 1, refCount: false })
-);
-
-
-  /** Watchlist enrichie (combineLatest) */
+  // --- Vue Combinée ---
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
     map(([list, quotes]) => {
-      const bySym = new Map(quotes.map((q) => [q.symbol, q]));
-      return list.map((w) => {
-        const q = bySym.get(w.symbol) ?? { symbol: w.symbol, price: NaN, changePct: 0, ts: Date.now() };
-        return { ...w, ...q } as WatchlistVm;
+      const qMap = new Map(quotes.map(q => [q.symbol, q]));
+      return list.map(w => {
+        const quote = qMap.get(w.symbol) ?? { 
+          symbol: w.symbol, price: 0, changePct: 0, ts: Date.now(), source: 'MOCK', type: 'STOCK' 
+        };
+        return { ...w, ...quote };
       });
     }),
-    shareReplay({ bufferSize: 1, refCount: false })
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
-  /** Filtrage + tri (map) */
+  // --- NOUVEAU : CALCULATEUR DE STATS ---
+  readonly stats$ = this.watchlistVm$.pipe(
+    map((items): MarketStats | null => {
+      if (!items.length) return null;
+
+      // 1. Top Winners/Losers
+      // On trie par performance
+      const sorted = [...items].sort((a, b) => b.changePct - a.changePct);
+      const topGainer = sorted[0];
+      const topLoser = sorted[sorted.length - 1];
+      
+      // 2. Moyenne
+      const avgChange = items.reduce((acc, i) => acc + i.changePct, 0) / items.length;
+
+      // 3. Distribution
+      const counts: Record<string, number> = {};
+      items.forEach(i => counts[i.type] = (counts[i.type] || 0) + 1);
+
+      const colorMap: Record<string, string> = {
+        'CRYPTO': '#8b5cf6', // Violet
+        'STOCK': '#0ea5e9',  // Bleu
+        'FOREX': '#10b981'   // Vert (ou autre)
+      };
+
+      const distribution = Object.entries(counts).map(([type, count]) => ({
+        type: type as AssetType,
+        count,
+        pct: (count / items.length) * 100,
+        color: colorMap[type] || '#64748b'
+      })).sort((a, b) => b.pct - a.pct); // Les plus gros segments d'abord
+
+      return { topGainer, topLoser, avgChange, totalCount: items.length, distribution };
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
+
+  // --- Filtrage ---
   readonly filteredWatchlistVm$ = combineLatest([this.watchlistVm$, this.filters$]).pipe(
     map(([items, f]) => {
-      const q = f.query.trim().toUpperCase();
-      const min = f.minChangePct;
+      // Si on est en mode STATS, on ne filtre pas la liste ici, mais le composant gérera l'affichage
+      if (f.assetType === 'STATS') return items; 
 
       let out = items;
-
-      if (q) out = out.filter((x) => x.symbol.includes(q));
-      if (typeof min === 'number') out = out.filter((x) => x.changePct >= min);
+      if (f.assetType !== 'ALL') out = out.filter(x => x.type === f.assetType);
+      
+      const q = f.query.trim().toUpperCase();
+      if (q) out = out.filter(x => x.symbol.includes(q));
+      
+      if (f.minChangePct) out = out.filter(x => x.changePct >= f.minChangePct!);
 
       const dir = f.sortDir === 'asc' ? 1 : -1;
       out = [...out].sort((a, b) => {
-        let av: number | string = a.symbol;
-        let bv: number | string = b.symbol;
-
-        if (f.sortBy === 'addedAt') { av = a.addedAt; bv = b.addedAt; }
-        if (f.sortBy === 'changePct') { av = a.changePct; bv = b.changePct; }
-
-        if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv) * dir;
-        return (Number(av) - Number(bv)) * dir;
+        let valA: any = a[f.sortBy];
+        let valB: any = b[f.sortBy];
+        if (typeof valA === 'string') return valA.localeCompare(valB) * dir;
+        return (valA - valB) * dir;
       });
-
       return out;
     }),
-    shareReplay({ bufferSize: 1, refCount: false })
+    shareReplay({ bufferSize: 1, refCount: true })
   );
 
   constructor() {
-    // Active le stream d’état + persistance
     this.state$.pipe(skip(1), tap(persistState)).subscribe();
   }
 
-  /** ---------- API du store (dispatch) ---------- */
-
-  addSymbol(symbol: string) {
-    this.actions$.next({ type: 'ADD_SYMBOL', symbol });
-  }
-  removeSymbol(symbol: string) {
-    this.actions$.next({ type: 'REMOVE_SYMBOL', symbol });
-  }
-  selectSymbol(symbol: string | null) {
-    this.actions$.next({ type: 'SELECT_SYMBOL', symbol });
-  }
-  setQuery(query: string) {
-    this.actions$.next({ type: 'SET_QUERY', query });
-  }
-  setMinChangePct(value: number | null) {
-    this.actions$.next({ type: 'SET_MIN_CHANGE_PCT', value });
-  }
-  setSort(sortBy: SortBy, sortDir: SortDir) {
-    this.actions$.next({ type: 'SET_SORT', sortBy, sortDir });
-  }
-  setRefreshMs(refreshMs: number) {
-    this.actions$.next({ type: 'SET_REFRESH_MS', refreshMs });
-  }
-  setApiToken(apiToken: string | null) {
-    this.actions$.next({ type: 'SET_API_TOKEN', apiToken });
-  }
-  reset() {
-    this.actions$.next({ type: 'RESET' });
-  }
-
+  // --- API ---
+  addSymbol(symbol: string) { this.actions$.next({ type: 'ADD_SYMBOL', symbol }); }
+  removeSymbol(symbol: string) { this.actions$.next({ type: 'REMOVE_SYMBOL', symbol }); }
+  selectSymbol(symbol: string | null) { this.actions$.next({ type: 'SELECT_SYMBOL', symbol }); }
+  setQuery(query: string) { this.actions$.next({ type: 'SET_QUERY', query }); }
+  setSort(sortBy: SortBy, sortDir: SortDir) { this.actions$.next({ type: 'SET_SORT', sortBy, sortDir }); }
+  setMinChangePct(value: number | null) { this.actions$.next({ type: 'SET_MIN_CHANGE_PCT', value }); }
+  setRefreshMs(refreshMs: number) { this.actions$.next({ type: 'SET_REFRESH_MS', refreshMs }); }
+  setAssetType(assetType: FilterType) { this.actions$.next({ type: 'SET_ASSET_TYPE', assetType }); }
+  reset() { this.actions$.next({ type: 'RESET' }); }
+  
   private computeInitialState(): MarketState {
-    const persisted = loadPersisted();
-    return {
-      ...DEFAULT_STATE,
-      ...persisted,
-      filters: { ...DEFAULT_STATE.filters, ...(persisted.filters ?? {}) },
-      settings: { ...DEFAULT_STATE.settings, ...(persisted.settings ?? {}) },
-    };
+    const p = loadPersisted();
+    return { ...DEFAULT_STATE, ...p, filters: { ...DEFAULT_STATE.filters, assetType: 'ALL' } };
   }
 }
