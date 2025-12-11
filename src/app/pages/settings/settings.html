@@ -1,24 +1,36 @@
 <section class="page">
   <h1>Settings</h1>
   <p class="muted">
-    Le token et le refresh alimentent des flux RxJS (ex: refreshMs$ → switchMap(timer)).
+    Mode <strong>WS</strong> = push temps réel via WebSocket (pas de refresh). Mode <strong>Poll</strong> = timer + /quote.
   </p>
 
   <div class="card">
-    <div class="row">
-      <label class="grow">
-        <span class="lbl">Finnhub API Token</span>
-        <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici (ne pas commit)" />
-      </label>
+    <label class="block">
+      <span class="lbl">Live mode</span>
+      <select class="inp" [formControl]="modeCtrl">
+        <option value="ws">WebSocket (push)</option>
+        <option value="poll">Polling REST (timer)</option>
+      </select>
+    </label>
 
-      <label>
-        <span class="lbl">Refresh (ms)</span>
-        <input class="inp" type="number" [formControl]="refreshCtrl" />
-      </label>
-    </div>
+    <label class="block">
+      <span class="lbl">Finnhub API Token</span>
+      <input class="inp" [formControl]="tokenCtrl" placeholder="colle ton token ici (ne pas commit)" />
+    </label>
 
-    <div class="muted mini" *ngIf="settings$ | async as s">
-      refreshMs = {{ s.refreshMs }} • token = {{ s.apiToken ? '✅ set' : '—' }}
+    <label class="block">
+      <span class="lbl">Refresh souhaité (ms) — utilisé uniquement en mode Poll</span>
+      <input class="inp" type="number" [formControl]="refreshCtrl" />
+      <div class="muted mini">
+        effectiveRefreshMs = {{ effectiveRefreshMs$ | async }}
+      </div>
+    </label>
+
+    <div class="sep"></div>
+
+    <div class="muted mini" *ngIf="wsStatus$ | async as st">
+      WS status: <strong>{{ st.state }}</strong>
+      <span *ngIf="st.lastError"> • {{ st.lastError }}</span>
     </div>
   </div>
 </section>

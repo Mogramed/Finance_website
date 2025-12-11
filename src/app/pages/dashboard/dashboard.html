@@ -1,103 +1,108 @@
-<section class="page">
-  <div class="head">
-    <div>
+<div class="page">
+  <header class="head">
+    <div class="title">
       <h1>Dashboard</h1>
-      <p class="muted">
-        Finnhub REST (/quote) + Store RxJS central (combineLatest / switchMap / forkJoin / retry / shareReplay).
+      <p class="subtitle">
+        Watchlist live via Store RxJS (combineLatest / switchMap / retry / shareReplay).
+        <span class="muted">Refresh effectif = anti rate-limit (si token).</span>
       </p>
     </div>
 
-    <div class="head-actions">
-      <span class="pill">watchlist: {{ (count$ | async) ?? 0 }}</span>
-      <button class="btn" type="button" (click)="reset()">Reset</button>
+    <div class="pills">
+      <span class="pill">watchlist: <b>{{ watchlistCount$ | async }}</b></span>
+      <span class="pill">refresh: <b>{{ refreshLabel$ | async }}</b></span>
+      <button class="btn ghost" type="button" (click)="resetAll()">Reset</button>
     </div>
-  </div>
+  </header>
 
-  <div class="card warn" *ngIf="(hasToken$ | async) === false">
-    <strong>Clé API manquante</strong>
-    <div class="muted">
-      Va dans <a routerLink="/settings">Settings</a> pour coller ton token (sinon fallback mock).
-    </div>
-  </div>
-
-  <div class="card controls">
-    <div class="row">
-      <label>
-        <span class="lbl">Recherche</span>
-        <input class="inp" [formControl]="queryCtrl" placeholder="AAPL, TSLA, MSFT..." />
+  <section class="card controls">
+    <div class="grid">
+      <label class="field">
+        <span>Recherche</span>
+        <input class="input" [formControl]="searchCtrl" placeholder="AAPL, TSLA, MSFT..." />
       </label>
 
-      <label>
-        <span class="lbl">Min change %</span>
-        <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="ex: 0.5" />
+      <label class="field">
+        <span>Min change %</span>
+        <input class="input" type="number" step="0.1" [formControl]="minChangeCtrl" placeholder="ex: 0.5" />
       </label>
 
-      <label>
-        <span class="lbl">Tri</span>
-        <select class="inp" [formControl]="sortByCtrl">
+      <label class="field">
+        <span>Tri</span>
+        <select class="input" [formControl]="sortByCtrl">
           <option value="addedAt">Ajout</option>
           <option value="symbol">Symbole</option>
-          <option value="changePct">Variation %</option>
+          <option value="changePct">% Change</option>
         </select>
       </label>
 
-      <label>
-        <span class="lbl">Sens</span>
-        <select class="inp" [formControl]="sortDirCtrl">
+      <label class="field">
+        <span>Sens</span>
+        <select class="input" [formControl]="sortDirCtrl">
           <option value="desc">Desc</option>
           <option value="asc">Asc</option>
         </select>
       </label>
     </div>
 
-    <div class="row addrow">
-      <label class="grow">
-        <span class="lbl">Ajouter (typeahead Finnhub)</span>
-        <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="ex: NVDA" />
-
-        <div class="suggestions" *ngIf="addSuggestions$ | async as s">
-          <button
-            class="suggestion"
-            *ngFor="let it of s"
-            type="button"
-            (click)="pickSuggestion(it.symbol)"
-          >
-            <strong>{{ it.symbol }}</strong>
-            <span class="muted">— {{ it.description }}</span>
-          </button>
-        </div>
+    <div class="add">
+      <label class="field grow">
+        <span>Ajouter (typeahead Finnhub)</span>
+        <input class="input" [formControl]="addCtrl" placeholder="ex: NVDA" (keydown.enter)="addSymbol()" />
       </label>
 
-      <button class="btn" type="button" (click)="add()">Add</button>
+      <button class="btn" type="button" (click)="addSymbol()">Add</button>
     </div>
-  </div>
 
-  <div class="grid">
+    <div class="suggestions" *ngIf="(suggestions$ | async) as sug">
+      <div class="sug" *ngIf="sug.length > 0">
+        <button class="sugItem" type="button" *ngFor="let s of sug" (click)="pickSuggestion(s)">
+          <b>{{ s.symbol }}</b>
+          <span class="muted">{{ s.description }}</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="bottom">
     <div class="card">
       <h2>Watchlist (live)</h2>
 
-      <div class="muted" *ngIf="(vm$ | async)?.length === 0">
-        Rien (ajoute un symbole).
+      <div class="empty" *ngIf="(rows$ | async)?.length === 0">
+        Rien pour l’instant.
+
+        <div class="muted" *ngIf="filters$ | async as f" style="margin-top:8px;">
+          <b>Filtres actifs:</b>
+          query="{{ f.query }}" • minChangePct="{{ f.minChangePct ?? 'null' }}"
+        </div>
+
+        <div class="muted" style="margin-top:8px;">
+          ➜ Clique sur <b>Reset</b> ou vide <b>Min change %</b> / <b>Recherche</b>.
+        </div>
       </div>
 
-      <ul class="list" *ngIf="vm$ | async as items">
-        <li *ngFor="let it of items" class="item">
-          <a class="sym" [routerLink]="['/symbol', it.symbol]">{{ it.symbol }}</a>
+      <ul class="list" *ngIf="rows$ | async as rows">
+        <li class="row" *ngFor="let r of rows">
+          <a class="sym" [routerLink]="['/symbol', r.symbol]">{{ r.symbol }}</a>
 
-          <span class="price">{{ it.price | number:'1.2-2' }}</span>
+          <span class="price" [class.na]="r.priceDisplay === '—'">{{ r.priceDisplay }}</span>
 
-          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
-            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
-          </span>
+          <span class="chg" [class.pos]="r.isUp" [class.neg]="r.isDown">{{ r.chgDisplay }}</span>
 
-          <button class="icon-btn" type="button" (click)="remove(it.symbol)">✕</button>
+          <span class="ts" [class.stale]="r.isStale">{{ r.updatedLabel }}</span>
+
+          <button class="icon" type="button" title="Remove" (click)="remove(r.symbol)">×</button>
         </li>
       </ul>
+
+      <p class="hint">
+        Si tu vois “—”, c’est souvent token invalide / rate-limit / marché fermé (pas d’updates).
+      </p>
     </div>
 
     <div class="card">
       <h2>State (debug)</h2>
-      <pre class="pre">{{ stateJson$ | async }}</pre>
+      <pre class="json">{{ (debug$ | async) | json }}</pre>
     </div>
-  </div>
-</section>
+  </section>
+</div>

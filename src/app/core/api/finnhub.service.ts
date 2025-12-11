@@ -3,14 +3,14 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface FinnhubQuote {
-  c: number;  // current price
-  d: number;  // change
-  dp: number; // percent change
+  c: number;
+  d: number;
+  dp: number;
   h: number;
   l: number;
   o: number;
   pc: number;
-  t: number;  // unix timestamp (seconds)
+  t: number;
 }
 
 export interface FinnhubSearchResult {
@@ -52,7 +52,7 @@ export interface FinnhubCompanyProfile2 {
 
 export interface FinnhubCompanyNewsItem {
   category: string;
-  datetime: number; // seconds
+  datetime: number;
   headline: string;
   id: number;
   image: string;

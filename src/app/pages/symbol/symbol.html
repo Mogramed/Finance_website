@@ -1,10 +1,7 @@
 <section class="page" *ngIf="symbol$ | async as sym">
   <div class="head">
     <div>
-      <h1>
-        <span class="pill">{{ sym }}</span>
-        <span class="muted"> — details</span>
-      </h1>
+      <h1><span class="pill">{{ sym }}</span> <span class="muted">— details</span></h1>
 
       <div class="muted" *ngIf="profile$ | async as p">
         <span *ngIf="p?.name"><strong>{{ p.name }}</strong></span>
@@ -25,35 +22,32 @@
 
   <div class="card warn" *ngIf="(hasToken$ | async) === false">
     <strong>Clé API manquante.</strong>
-    <div class="muted">
-      Va dans <a routerLink="/settings">Settings</a> pour coller ton token Finnhub.
-    </div>
+    <div class="muted">Va dans <a routerLink="/settings">Settings</a> pour coller ton token Finnhub.</div>
   </div>
 
   <div class="grid">
     <div class="card">
-  <h2>Quote (live)</h2>
+      <h2>Quote (live)</h2>
 
-  <ng-container *ngIf="quote$ | async as q; else noQuote">
-    <div class="price">
-      {{ isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}
+      <ng-container *ngIf="quote$ | async as q; else noQuote">
+        <div class="price">{{ q && isFiniteNumber(q.c) ? (q.c | number:'1.2-2') : '—' }}</div>
+
+        <div class="chg"
+             [class.pos]="q && isFiniteNumber(q.dp) && q.dp >= 0"
+             [class.neg]="q && isFiniteNumber(q.dp) && q.dp < 0">
+          {{ q && isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ q && isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
+          <span class="muted"> ({{ q && isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
+        </div>
+
+        <div class="muted mini">
+          O {{ q.o | number:'1.2-2' }} • H {{ q.h | number:'1.2-2' }} • L {{ q.l | number:'1.2-2' }} • Prev {{ q.pc | number:'1.2-2' }}
+        </div>
+      </ng-container>
+
+      <ng-template #noQuote>
+        <div class="muted">Pas de quote (souvent : rate-limit ou token absent).</div>
+      </ng-template>
     </div>
-
-    <div class="chg"
-         [class.pos]="isFiniteNumber(q.dp) && q.dp >= 0"
-         [class.neg]="isFiniteNumber(q.dp) && q.dp < 0">
-      {{ isFiniteNumber(q.dp) && q.dp >= 0 ? '+' : '' }}{{ isFiniteNumber(q.dp) ? (q.dp | number:'1.2-2') : '—' }}%
-      <span class="muted"> ({{ isFiniteNumber(q.d) ? (q.d | number:'1.2-2') : '—' }})</span>
-    </div>
-
-    <div class="muted mini">O {{ q.o }} • H {{ q.h }} • L {{ q.l }} • Prev {{ q.pc }}</div>
-  </ng-container>
-
-  <ng-template #noQuote>
-    <div class="muted">Pas de quote (token manquant, rate limit, ou symbole invalide).</div>
-  </ng-template>
-</div>
-
 
     <div class="card">
       <div class="row">
@@ -83,10 +77,7 @@
           <polyline *ngIf="vm.points" [attr.points]="vm.points" fill="none" stroke="currentColor" stroke-width="2" />
         </svg>
 
-        <div class="muted mini">
-          points: {{ vm.n }} • min: {{ vm.min | number:'1.2-2' }} • max: {{ vm.max | number:'1.2-2' }}
-        </div>
-
+        <div class="muted mini">points: {{ vm.n }} • min: {{ vm.min | number:'1.2-2' }} • max: {{ vm.max | number:'1.2-2' }}</div>
         <div class="muted" *ngIf="!vm.points">Pas de données (no_data) ou trop peu de points.</div>
       </div>
     </div>

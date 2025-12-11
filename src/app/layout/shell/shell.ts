@@ -1,10 +1,11 @@
-import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-shell',
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  standalone: true,
+  imports: [CommonModule, RouterLink, RouterOutlet],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
 })
