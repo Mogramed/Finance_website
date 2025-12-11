@@ -1,24 +1,39 @@
 export type MarketSource = 'BINANCE' | 'TWELVE_DATA' | 'TIINGO' | 'MOCK';
 export type AssetType = 'CRYPTO' | 'FOREX' | 'STOCK';
 
-// Le format standard unique pour tout le site
 export interface UniversalQuote {
   symbol: string;
   price: number;
   changePct: number;
-  ts: number;          // Timestamp en ms
+  ts: number;
   source: MarketSource;
   type: AssetType;
 }
 
-// Petite fonction utilitaire pour deviner le type d'actif
+// NOUVEAU : Pour le graphique
+export interface Candle {
+  time: number; // Unix timestamp (seconds)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
+
+export interface CompanyProfile {
+  name: string;
+  description: string;
+  exchange: string;
+  sector: string;
+  logo?: string;
+}
+
+// ... fonction getAssetType existante ...
 export function getAssetType(symbol: string): AssetType {
   const s = symbol.toUpperCase();
-  // Crypto : finit souvent par USDT, BUSD ou est un coin majeur
   if (s.endsWith('USDT') || s.endsWith('BUSD') || ['BTC', 'ETH', 'SOL', 'XRP', 'BNB'].includes(s)) {
     return 'CRYPTO';
   }
-  // Forex : contient / ou est une paire de devises connue (ex: EURUSD)
   if (s.includes('/') || (s.length === 6 && !/\d/.test(s) && (s.startsWith('USD') || s.endsWith('USD')))) {
     return 'FOREX';
   }
