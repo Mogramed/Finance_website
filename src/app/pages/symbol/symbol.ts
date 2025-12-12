@@ -3,10 +3,10 @@ import { Component, ElementRef, ViewChild, inject, OnInit, OnDestroy, AfterViewI
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Observable, switchMap, map, shareReplay, combineLatest, BehaviorSubject, of } from 'rxjs';
 import { MarketDataService } from '../../core/api/market-data.service';
-import { createChart, ISeriesApi, CandlestickSeries } from 'lightweight-charts'; 
+import { createChart, ISeriesApi, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts'; 
 import { AssetType, getAssetType, UniversalQuote, Candle } from '../../core/api/market-interfaces';
-import { DestroyRef } from '@angular/core'; // <-- Import nécessaire
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop'; // <-- Import nécessaire
+import { DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-symbol',
@@ -18,14 +18,30 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop'; // <-- Import n
 export class Symbol implements OnInit, OnDestroy, AfterViewInit {
   private readonly route = inject(ActivatedRoute);
   private readonly marketData = inject(MarketDataService);
-  private readonly platformId = inject(PLATFORM_ID); // <-- Pour savoir si on est sur le serveur ou navigateur
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly destroyRef = inject(DestroyRef);
+
   @ViewChild('chartContainer') chartContainer!: ElementRef<HTMLDivElement>;
   
   private chart: any = null;
+  
+  // SÉRIES GRAPHIQUES
   private candlestickSeries: ISeriesApi<'Candlestick'> | null = null;
+  private volumeSeries: ISeriesApi<'Histogram'> | null = null;
+  private smaSeries: ISeriesApi<'Line'> | null = null;
+  private emaSeries: ISeriesApi<'Line'> | null = null;
+  // Bollinger Bands (3 lignes)
+  private bbUpperSeries: ISeriesApi<'Line'> | null = null;
+  private bbLowerSeries: ISeriesApi<'Line'> | null = null;
+
   private lastCandle: Candle | null = null;
   private resizeObserver: ResizeObserver | null = null;
+
+  // ÉTAT DES INDICATEURS
+  showVolume = true;
+  showSMA = false;
+  showEMA = false;
+  showBB = false;
 
   readonly resolution$ = new BehaviorSubject<string>('1h');
   
@@ -48,7 +64,6 @@ export class Symbol implements OnInit, OnDestroy, AfterViewInit {
 
   readonly liveQuote$ = this.symbol$.pipe(
     switchMap(sym => {
-      // Pas de live quote côté serveur pour éviter les fuites de mémoire
       if (!isPlatformBrowser(this.platformId)) return of(null);
       return this.marketData.watch([sym], 10000).pipe(
         map(quotes => quotes.find(q => q.symbol === sym))
@@ -57,34 +72,126 @@ export class Symbol implements OnInit, OnDestroy, AfterViewInit {
   );
 
   ngOnInit() {
-    // On ne charge l'historique que côté navigateur pour l'instant pour éviter les erreurs SSR
     if (isPlatformBrowser(this.platformId)) {
       combineLatest([this.symbol$, this.resolution$]).pipe(
         switchMap(([sym, res]) => this.marketData.getHistory(sym, res)),
         takeUntilDestroyed(this.destroyRef)
       ).subscribe(candles => {
-        if (this.candlestickSeries && candles.length > 0) {
-          this.candlestickSeries.setData(candles as any);
+        if (this.chart && candles.length > 0) {
+          // 1. DATA PRINCIPALE
+          this.candlestickSeries?.setData(candles as any);
           this.lastCandle = candles[candles.length - 1]; 
-          this.chart?.timeScale().fitContent();
+
+          // 2. VOLUME
+          const volumeData = candles.map(c => ({
+            time: c.time,
+            value: c.volume ?? 0,
+            color: c.close >= c.open ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'
+          }));
+          this.volumeSeries?.setData(volumeData as any);
+
+          // 3. INDICATEURS (Calculs)
+          this.updateIndicators(candles);
+
+          this.chart.timeScale().fitContent();
         }
       });
 
-      // 2. Live Update (C'est ici que ça plantait)
-      this.liveQuote$.pipe(
-        takeUntilDestroyed(this.destroyRef) // <-- CRITIQUE : Coupe le robinet avant de détruire le chart
-      ).subscribe(quote => {
+      this.liveQuote$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(quote => {
         if (quote) this.updateChartWithLiveQuote(quote);
       });
     }
   }
 
-// 3. Sécurité supplémentaire dans la méthode d'update
+  // --- LOGIQUE INDICATEURS ---
+
+  toggleVolume() {
+    this.showVolume = !this.showVolume;
+    this.volumeSeries?.applyOptions({ visible: this.showVolume });
+  }
+
+  toggleSMA() {
+    this.showSMA = !this.showSMA;
+    this.smaSeries?.applyOptions({ visible: this.showSMA });
+  }
+
+  toggleEMA() {
+    this.showEMA = !this.showEMA;
+    this.emaSeries?.applyOptions({ visible: this.showEMA });
+  }
+
+  toggleBB() {
+    this.showBB = !this.showBB;
+    this.bbUpperSeries?.applyOptions({ visible: this.showBB });
+    this.bbLowerSeries?.applyOptions({ visible: this.showBB });
+  }
+
+  private updateIndicators(candles: Candle[]) {
+    // SMA 20
+    if (this.smaSeries) {
+      this.smaSeries.setData(this.calculateSMA(candles, 20) as any);
+    }
+    // EMA 50
+    if (this.emaSeries) {
+      this.emaSeries.setData(this.calculateEMA(candles, 50) as any);
+    }
+    // Bollinger Bands (20, 2)
+    if (this.bbUpperSeries && this.bbLowerSeries) {
+      const { upper, lower } = this.calculateBB(candles, 20, 2);
+      this.bbUpperSeries.setData(upper as any);
+      this.bbLowerSeries.setData(lower as any);
+    }
+  }
+
+  // --- MATHS (Moteur de calcul) ---
+
+  private calculateSMA(data: Candle[], period: number) {
+    const result = [];
+    for (let i = period - 1; i < data.length; i++) {
+      const slice = data.slice(i - period + 1, i + 1);
+      const sum = slice.reduce((acc, val) => acc + val.close, 0);
+      result.push({ time: data[i].time, value: sum / period });
+    }
+    return result;
+  }
+
+  private calculateEMA(data: Candle[], period: number) {
+    const k = 2 / (period + 1);
+    const result = [];
+    let ema = data[0].close; // Initialisation simple
+    for (let i = 0; i < data.length; i++) {
+      ema = data[i].close * k + ema * (1 - k);
+      if (i >= period) { // On commence à afficher après la période de chauffe
+        result.push({ time: data[i].time, value: ema });
+      }
+    }
+    return result;
+  }
+
+  private calculateBB(data: Candle[], period: number, stdDevMult: number) {
+    const upper = [];
+    const lower = [];
+    
+    for (let i = period - 1; i < data.length; i++) {
+      const slice = data.slice(i - period + 1, i + 1);
+      const mean = slice.reduce((acc, val) => acc + val.close, 0) / period;
+      
+      const squaredDiffs = slice.map(val => Math.pow(val.close - mean, 2));
+      const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / period;
+      const stdDev = Math.sqrt(variance);
+
+      upper.push({ time: data[i].time, value: mean + stdDev * stdDevMult });
+      lower.push({ time: data[i].time, value: mean - stdDev * stdDevMult });
+    }
+    return { upper, lower };
+  }
+
+  // --- LIVE UPDATE ---
+
   private updateChartWithLiveQuote(quote: UniversalQuote) {
-    // On vérifie que 'chart' existe encore. Si 'chart' est null (détruit), on arrête tout.
     if (!this.chart || !this.candlestickSeries || !this.lastCandle) return;
+
     const price = quote.price;
-    // On met à jour visuellement la dernière bougie
     const updatedCandle = {
       ...this.lastCandle,
       close: price,
@@ -101,32 +208,43 @@ export class Symbol implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    // --- PROTECTION SSR CRITIQUE ---
-    // Si on est sur le serveur, on arrête tout de suite.
-    // 'document' n'existe pas ici.
-    if (!isPlatformBrowser(this.platformId)) return; 
-
-    if (!this.chartContainer) return;
+    if (!isPlatformBrowser(this.platformId) || !this.chartContainer) return;
 
     this.chart = createChart(this.chartContainer.nativeElement, {
       width: this.chartContainer.nativeElement.clientWidth,
-      height: 400,
+      height: 450,
       layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
       grid: { vertLines: { color: 'rgba(30, 41, 59, 0.5)' }, horzLines: { color: 'rgba(30, 41, 59, 0.5)' } },
       timeScale: { borderColor: '#334155', timeVisible: true },
       crosshair: { mode: 1 },
     });
 
+    // 1. VOLUME
+    this.volumeSeries = this.chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: '', 
+      scaleMargins: { top: 0.8, bottom: 0 },
+    });
+
+    // 2. BOUGIES
     this.candlestickSeries = this.chart.addSeries(CandlestickSeries, {
       upColor: '#10b981', downColor: '#ef4444',
       borderUpColor: '#10b981', borderDownColor: '#ef4444',
       wickUpColor: '#10b981', wickDownColor: '#ef4444',
     });
 
+    // 3. INDICATEURS
+    // SMA (Jaune)
+    this.smaSeries = this.chart.addSeries(LineSeries, { color: '#fbbf24', lineWidth: 2, visible: this.showSMA, title: 'SMA 20' });
+    // EMA (Bleu)
+    this.emaSeries = this.chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 2, visible: this.showEMA, title: 'EMA 50' });
+    // Bollinger (Violet)
+    this.bbUpperSeries = this.chart.addSeries(LineSeries, { color: 'rgba(167, 139, 250, 0.5)', lineWidth: 1, visible: this.showBB });
+    this.bbLowerSeries = this.chart.addSeries(LineSeries, { color: 'rgba(167, 139, 250, 0.5)', lineWidth: 1, visible: this.showBB });
+
     this.resizeObserver = new ResizeObserver(entries => {
       if (entries.length === 0 || !entries[0].contentRect) return;
-      const { width } = entries[0].contentRect;
-      this.chart?.applyOptions({ width });
+      this.chart?.applyOptions({ width: entries[0].contentRect.width });
     });
     
     this.resizeObserver.observe(this.chartContainer.nativeElement);

@@ -1,6 +1,9 @@
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { firstValueFrom, take } from 'rxjs';
 import { MarketStore } from './market.store';
+import { timer, of } from 'rxjs';
+import { map, distinctUntilChanged, switchMap } from 'rxjs/operators';
+
 
 function readLS(key: string) {
   return JSON.parse(localStorage.getItem(key) ?? 'null');
@@ -69,11 +72,11 @@ describe('MarketStore (Vitest)', () => {
     expect(saved.settings.refreshMs).toBe(900);
   }));
 
-  it('liveTick$ reacts to refreshMs changes (switchMap(timer))', fakeAsync(() => {
+    it('liveTick$ reacts to refreshMs changes (switchMap(timer))', fakeAsync(() => {
     const store = TestBed.inject(MarketStore);
 
     let ticksCount = 0;
-    const sub = store.liveTick$.subscribe(() => ticksCount++);
+    const sub = (store as any).liveTick$.subscribe(() => ticksCount++);
 
     tick(0);
     expect(ticksCount).toBeGreaterThan(0);

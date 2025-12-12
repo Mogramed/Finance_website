@@ -68,6 +68,7 @@ export class AlphaVantageService {
           high: parseFloat(series[date]['2. high']),
           low: parseFloat(series[date]['3. low']),
           close: parseFloat(series[date]['4. close']),
+          volume: parseFloat(series[date]['5. volume'])
         })).reverse();
       }),
       catchError(() => of([]))

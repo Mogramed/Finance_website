@@ -7,9 +7,11 @@ import {
   debounceTime,
   distinctUntilChanged,
   map,
+  of,
   startWith,
   switchMap,
 } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { MarketStore, FilterType } from '../../core/store/market.store';
 import { TwelveDataService } from '../../core/api/twelvedata.service';
 
@@ -40,10 +42,24 @@ export class Dashboard {
   readonly sortDirCtrl = new FormControl('desc', { nonNullable: true });
   readonly addCtrl = new FormControl('', { nonNullable: true });
 
+  // État du loader
+  isSearching = false;
+
   readonly addSuggestions$ = this.addCtrl.valueChanges.pipe(
     debounceTime(300),
     distinctUntilChanged(),
-    switchMap((val) => this.twelveData.search(val))
+    // On allume le loader
+    tap(() => this.isSearching = true), 
+    switchMap((val) => 
+      this.twelveData.search(val).pipe(
+        // On éteint le loader (succès ou erreur)
+        tap(() => this.isSearching = false),
+        catchError(() => {
+          this.isSearching = false;
+          return of([]);
+        })
+      )
+    )
   );
 
   constructor() {
@@ -75,28 +91,11 @@ export class Dashboard {
     ).subscribe((v) => this.store.setSort(this.sortByCtrl.value as any, v as any));
   }
 
-  // NOUVEAU : Méthode pour éditer une position
-  editPosition(item: any) {
-    const qtyStr = prompt(`Quantité détenue pour ${item.symbol} ?`, item.position?.quantity || '0');
-    if (qtyStr === null) return;
-    
-    const qty = parseFloat(qtyStr);
-    if (isNaN(qty)) return;
-
-    if (qty === 0) {
-      this.store.updatePosition(item.symbol, 0, 0); // Suppression
-      return;
-    }
-
-    const priceStr = prompt(`Prix d'achat moyen ($) ?`, item.position?.avgPrice || item.price || '0');
-    if (priceStr === null) return;
-    
-    const price = parseFloat(priceStr);
-    if (!isNaN(price)) {
-      this.store.updatePosition(item.symbol, qty, price);
-    }
+  // --- CORRECTION : AJOUT DE LA MÉTHODE MANQUANTE ---
+  trackBySymbol(index: number, item: any): string {
+    return item.symbol;
   }
-  
+
   setTab(type: FilterType) {
     this.store.setAssetType(type);
   }
