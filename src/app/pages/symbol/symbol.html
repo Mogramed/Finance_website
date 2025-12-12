@@ -18,20 +18,33 @@
     <div class="main-col">
       <div class="card chart-card">
         <div class="chart-toolbar">
-          <div class="res-group">
-            <button 
-              *ngFor="let r of resolutions" 
-              class="res-btn" 
-              [class.active]="(resolution$ | async) === r.val"
-              (click)="setResolution(r.val)">
-              {{ r.label }}
-            </button>
-          </div>
-          <div class="chart-status">
-            <span class="dot"></span> Live
-          </div>
+        <div class="res-group">
+          <button *ngFor="let r of resolutions" class="res-btn" 
+            [class.active]="(resolution$ | async) === r.val"
+            (click)="setResolution(r.val)">
+            {{ r.label }}
+          </button>
         </div>
 
+        <div class="indicators-group">
+          <button class="ind-btn" [class.active]="showVolume" (click)="toggleVolume()" title="Volume">
+            VOL
+          </button>
+          <button class="ind-btn" [class.active]="showSMA" (click)="toggleSMA()" title="Simple Moving Average (20)">
+            SMA
+          </button>
+          <button class="ind-btn" [class.active]="showEMA" (click)="toggleEMA()" title="Exponential Moving Average (50)">
+            EMA
+          </button>
+          <button class="ind-btn" [class.active]="showBB" (click)="toggleBB()" title="Bollinger Bands">
+            BB
+          </button>
+        </div>
+
+        <div class="chart-status">
+          <span class="dot"></span> Live
+        </div>
+      </div>
         <div class="chart-container" #chartContainer></div>
       </div>
 

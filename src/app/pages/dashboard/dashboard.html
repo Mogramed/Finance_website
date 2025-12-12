@@ -19,184 +19,277 @@
     <button class="tab-btn" [class.active]="active === 'STOCK'" (click)="setTab('STOCK')">Stocks</button>
     <button class="tab-btn" [class.active]="active === 'FOREX'" (click)="setTab('FOREX')">Forex</button>
     <button class="tab-btn stats-tab" [class.active]="active === 'STATS'" (click)="setTab('STATS')">
-      📊 Stats & Perf
+      📊 Portfolio PRO
     </button>
   </div>
 
-  <ng-container *ngIf="(activeTab$ | async) === 'STATS'">
-    <div class="stats-container" *ngIf="stats$ | async as s">
-      
-
-    <div class="card balance-card" *ngIf="s.totalValue > 0">
-        <div class="balance-header">
-          <span class="label">Solde Portefeuille</span>
-          <span class="pnl-badge" [class.pos]="s.totalPnl >= 0" [class.neg]="s.totalPnl < 0">
-            {{ s.totalPnl >= 0 ? '+' : '' }}{{ s.totalPnl | number:'1.2-2' }} $
-          </span>
-        </div>
-        <div class="balance-val">{{ s.totalValue | number:'1.2-2' }} $</div>
-        <div class="balance-invested">Investi : {{ s.totalInvested | number:'1.2-2' }} $</div>
-      </div>
-
-
-      <div class="kpi-grid">
-        <div class="stat-card win">
-          <div class="lbl">🏆 Top Winner</div>
-          <div class="val" *ngIf="s.topGainer">
-            {{ s.topGainer.symbol }}
-            <span class="pct">+{{ s.topGainer.changePct | number:'1.2-2' }}%</span>
+  <ng-container *ngIf="activeTab$ | async as active">
+    
+    <ng-container *ngIf="active === 'STATS'">
+      <div class="stats-container" *ngIf="stats$ | async as s">
+        <div class="tabs" *ngIf="activeTab$ | async as active">
+        <button class="tab-btn" [class.active]="active === 'ALL'" (click)="setTab('ALL')">Global</button>
+        <button class="tab-btn" [class.active]="active === 'CRYPTO'" (click)="setTab('CRYPTO')">Cryptos</button>
+        <button class="tab-btn" [class.active]="active === 'STOCK'" (click)="setTab('STOCK')">Stocks</button>
+        <button class="tab-btn" [class.active]="active === 'FOREX'" (click)="setTab('FOREX')">Forex</button>
+        <button class="tab-btn stats-tab" [class.active]="active === 'STATS'" (click)="setTab('STATS')">
+        📊 Portfolio PRO
+    </button>
+  </div>
+        <div class="metrics-row">
+          <div class="metric-card net-worth">
+            <div class="icon">💰</div>
+            <div class="info">
+              <span class="label">Valeur Nette</span>
+              <span class="value">{{ s.netWorth | number:'1.2-2' }} $</span>
+            </div>
           </div>
-          <div class="sub" *ngIf="s.topGainer">{{ s.topGainer.price | number:'1.2-5' }} $</div>
-          <div class="muted" *ngIf="!s.topGainer">—</div>
-        </div>
 
-        <div class="stat-card loss">
-          <div class="lbl">📉 Top Loser</div>
-          <div class="val" *ngIf="s.topLoser">
-            {{ s.topLoser.symbol }}
-            <span class="pct">{{ s.topLoser.changePct | number:'1.2-2' }}%</span>
-          </div>
-          <div class="sub" *ngIf="s.topLoser">{{ s.topLoser.price | number:'1.2-5' }} $</div>
-          <div class="muted" *ngIf="!s.topLoser">—</div>
-        </div>
-
-        <div class="stat-card avg">
-          <div class="lbl">⚖️ Moyenne Globale</div>
-          <div class="val" [class.pos]="s.avgChange >= 0" [class.neg]="s.avgChange < 0">
-            {{ s.avgChange > 0 ? '+' : ''}}{{ s.avgChange | number:'1.2-2' }}%
-          </div>
-          <div class="sub">Sur {{ s.totalCount }} actifs</div>
-        </div>
-      </div>
-
-      <div class="card distribution-card">
-        <h2>Allocation du Portefeuille</h2>
-        <div class="dist-bar">
-          <div 
-            class="segment" 
-            *ngFor="let d of s.distribution" 
-            [style.width.%]="d.pct" 
-            [style.background]="d.color"
-            [title]="d.type + ': ' + (d.pct | number:'1.0-1') + '%'"
-          ></div>
-        </div>
-        <div class="dist-legend">
-          <div class="leg-item" *ngFor="let d of s.distribution">
-            <span class="dot" [style.background]="d.color"></span>
-            <span class="type">{{ d.type }}</span>
-            <span class="count">{{ d.count }} ({{ d.pct | number:'1.0-0' }}%)</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </ng-container>
-
-  <ng-container *ngIf="(activeTab$ | async) !== 'STATS'">
-    <div class="card controls">
-      <div class="row">
-        <label>
-          <span class="lbl">Rechercher</span>
-          <input class="inp" [formControl]="queryCtrl" placeholder="ex: BTC..." />
-        </label>
-
-        <label>
-          <span class="lbl">Min Variation %</span>
-          <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="0.00" />
-        </label>
-
-        <label>
-          <span class="lbl">Trier par</span>
-          <select class="inp" [formControl]="sortByCtrl">
-            <option value="addedAt">Récents</option>
-            <option value="symbol">Symbole (A-Z)</option>
-            <option value="changePct">Performance</option>
-          </select>
-        </label>
-
-        <label>
-          <span class="lbl">Ordre</span>
-          <select class="inp" [formControl]="sortDirCtrl">
-            <option value="desc">Descendant ⬇</option>
-            <option value="asc">Ascendant ⬆</option>
-          </select>
-        </label>
-      </div>
-
-      <hr />
-
-      <div class="add-row">
-        <label class="grow relative">
-          <span class="lbl">Ajouter un actif</span>
-          <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="Tapez un symbole (ex: AAPL, ETHUSDT)..." />
-
-          <div class="suggestions" *ngIf="addSuggestions$ | async as s">
-            <button
-              class="suggestion"
-              *ngFor="let it of s"
-              type="button"
-              (click)="pickSuggestion(it.symbol)"
-            >
-              <strong>{{ it.symbol }}</strong>
-              <span class="muted">{{ it.description }}</span>
-            </button>
-          </div>
-        </label>
-
-        <button class="btn" type="button" (click)="add()">Ajouter +</button>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card fill-h">
-        <h2 *ngIf="activeTab$ | async as active">
-          {{ active === 'ALL' ? 'Vue Globale' : '' }}
-          {{ active === 'CRYPTO' ? 'Portefeuille Crypto' : '' }}
-          {{ active === 'STOCK' ? 'Actions & ETFs' : '' }}
-          {{ active === 'FOREX' ? 'Marché des Devises' : '' }}
-        </h2>
-
-        <div class="muted" style="text-align:center; margin-top: 2rem;" *ngIf="(vm$ | async)?.length === 0">
-          Aucun actif dans cette catégorie.
-        </div>
-
-        <ul class="list" *ngIf="vm$ | async as items">
-          <li *ngFor="let it of items" class="item">
-          <a class="sym" [routerLink]="['/symbol', it.symbol]">
-            {{ it.symbol }}
-            <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
-          </a>
-
-          <span class="price">
-             {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
-          </span>
-
-          <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
-            {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
-          </span>
-
-          <div class="position-info" (click)="editPosition(it)" title="Modifier ma position">
-            <ng-container *ngIf="it.position; else noPos">
-              <span class="pnl-val" [class.pos]="(it.pnl ?? 0) >= 0" [class.neg]="(it.pnl ?? 0) < 0">
-                {{ (it.pnl ?? 0) >= 0 ? '+' : '' }}{{ it.pnl | number:'1.2-2' }} $
+          <div class="metric-card">
+            <div class="icon" [class.up]="s.totalPnl >= 0" [class.down]="s.totalPnl < 0">
+              {{ s.totalPnl >= 0 ? '📈' : '📉' }}
+            </div>
+            <div class="info">
+              <span class="label">PnL Total (Latent)</span>
+              <span class="value" [class.pos]="s.totalPnl >= 0" [class.neg]="s.totalPnl < 0">
+                {{ s.totalPnl >= 0 ? '+' : '' }}{{ s.totalPnl | number:'1.2-2' }} $
               </span>
-              <span class="qty-lbl">{{ it.position.quantity }} @ {{ it.position.avgPrice }}</span>
-            </ng-container>
-            <ng-template #noPos>
-              <span class="add-pos-btn">+ 💼</span>
-            </ng-template>
+            </div>
           </div>
-          
-          <span class="source-badge" title="Source: {{ it.source }}">
-            {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
-          </span>
 
-          <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </li>
-        </ul>
+          <div class="metric-card">
+            <div class="icon">📅</div>
+            <div class="info">
+              <span class="label">PnL Journalier (Est.)</span>
+              <span class="value" [class.pos]="s.dailyPnl >= 0" [class.neg]="s.dailyPnl < 0">
+                {{ s.dailyPnl >= 0 ? '+' : '' }}{{ s.dailyPnl | number:'1.2-2' }} $
+              </span>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="icon">💵</div>
+            <div class="info">
+              <span class="label">Cash Disponible</span>
+              <span class="value text-white">{{ s.balance | number:'1.2-2' }} $</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="card allocation-card">
+            <h2>Allocation d'Actifs</h2>
+            <div class="allocation-content">
+              <div class="pie-chart" [style]="'--p-crypto:' + (s.allocation[0]?.pct || 0) + '%; --c-crypto:' + (s.allocation[0]?.color || '#333')">
+                <div class="inner-pie">
+                  <span>{{ s.totalValue | number:'1.0-0' }} $</span>
+                </div>
+              </div>
+              
+              <div class="legend">
+                <div class="legend-item" *ngFor="let item of s.allocation">
+                  <span class="dot" [style.background]="item.color"></span>
+                  <span class="type">{{ item.type }}</span>
+                  <span class="pct">{{ item.pct | number:'1.1-1' }}%</span>
+                  <span class="val muted">{{ item.value | number:'1.0-0' }}$</span>
+                </div>
+                <div class="legend-item" *ngIf="s.allocation.length === 0">
+                  <span class="muted">Aucun investissement</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card movers-card">
+            <h2>Performance du Jour</h2>
+            <div class="mover-item winner" *ngIf="s.topGainer">
+              <span class="rank">🏆 Top Winner</span>
+              <div class="mover-info">
+                <span class="sym">{{ s.topGainer.symbol }}</span>
+                <span class="pct">+{{ s.topGainer.changePct | number:'1.2-2' }}%</span>
+              </div>
+              <span class="price">{{ s.topGainer.price | number:'1.2-2' }}$</span>
+            </div>
+
+            <div class="mover-item loser" *ngIf="s.topLoser">
+              <span class="rank">📉 Top Loser</span>
+              <div class="mover-info">
+                <span class="sym">{{ s.topLoser.symbol }}</span>
+                <span class="pct">{{ s.topLoser.changePct | number:'1.2-2' }}%</span>
+              </div>
+              <span class="price">{{ s.topLoser.price | number:'1.2-2' }}$</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card holdings-card">
+          <h2>Vos Positions</h2>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Actif</th>
+                  <th class="right">Quantité</th>
+                  <th class="right">Prix Moyen</th>
+                  <th class="right">Prix Actuel</th>
+                  <th class="right">Valeur</th>
+                  <th class="right">PnL Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <ng-container *ngFor="let item of (vm$ | async)">
+                  <tr *ngIf="item.position">
+                    <td>
+                      <span class="sym">{{ item.symbol }}</span>
+                      <span class="tag micro">{{ item.type }}</span>
+                    </td>
+                    <td class="right">{{ item.position.quantity }}</td>
+                    <td class="right muted">{{ item.position.avgPrice | number:'1.2-2' }}$</td>
+                    <td class="right">{{ item.price | number:'1.2-2' }}$</td>
+                    <td class="right font-bold">{{ item.holdingValue | number:'1.2-2' }}$</td>
+                    <td class="right">
+                      <span [class.pos]="(item.pnl || 0) >= 0" [class.neg]="(item.pnl || 0) < 0">
+                        {{ (item.pnl || 0) >= 0 ? '+' : '' }}{{ item.pnl | number:'1.2-2' }}$
+                        <small>({{ item.pnlPct | number:'1.1-1' }}%)</small>
+                      </span>
+                    </td>
+                  </tr>
+                </ng-container>
+                <tr *ngIf="s.totalValue === 0">
+                  <td colspan="6" class="center muted p-4">Aucune position ouverte. Allez dans l'onglet "Trading" pour investir.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </ng-container>
+
+    <ng-container *ngIf="active !== 'STATS'">
+      <div class="card controls">
+        <div class="row">
+          <label>
+            <span class="lbl">Filtrer</span>
+            <div class="search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input class="inp" [formControl]="queryCtrl" placeholder="ex: BTC..." />
+              <button *ngIf="queryCtrl.value" class="clear-btn" (click)="queryCtrl.setValue('')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          </label>
+
+          <label>
+            <span class="lbl">Min Variation %</span>
+            <input class="inp" type="number" [formControl]="minChangeCtrl" placeholder="0.00" />
+          </label>
+
+          <label>
+            <span class="lbl">Trier par</span>
+            <select class="inp" [formControl]="sortByCtrl">
+              <option value="addedAt">Récents</option>
+              <option value="symbol">Symbole (A-Z)</option>
+              <option value="changePct">Performance</option>
+            </select>
+          </label>
+
+          <label>
+            <span class="lbl">Ordre</span>
+            <select class="inp" [formControl]="sortDirCtrl">
+              <option value="desc">Descendant ⬇</option>
+              <option value="asc">Ascendant ⬆</option>
+            </select>
+          </label>
+        </div>
+
+        <hr />
+
+        <div class="add-row">
+          <label class="grow relative">
+            <span class="lbl">Ajouter un actif (Watchlist)</span>
+            <div class="search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input class="inp" [formControl]="addCtrl" (keydown.enter)="add()" placeholder="Rechercher API..." />
+              
+              <div class="mini-loader" *ngIf="isSearching"></div>
+              
+              <button *ngIf="addCtrl.value && !isSearching" class="clear-btn" (click)="addCtrl.setValue('')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div class="suggestions" *ngIf="addSuggestions$ | async as s">
+              <button class="suggestion" *ngFor="let it of s" type="button" (click)="pickSuggestion(it.symbol)">
+                <strong>{{ it.symbol }}</strong>
+                <span class="muted">— {{ it.description }}</span>
+              </button>
+            </div>
+          </label>
+
+          <button class="btn" type="button" (click)="add()">Ajouter +</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card fill-h">
+          <h2 *ngIf="active">
+            {{ active === 'ALL' ? 'Vue Globale' : '' }}
+            {{ active === 'CRYPTO' ? 'Crypto Market' : '' }}
+            {{ active === 'STOCK' ? 'Stocks & ETFs' : '' }}
+            {{ active === 'FOREX' ? 'Forex' : '' }}
+          </h2>
+
+          <div class="muted" style="text-align:center; margin-top: 2rem;" *ngIf="(vm$ | async)?.length === 0">
+            Aucun actif surveillé.
+          </div>
+
+          <ul class="list" *ngIf="vm$ | async as items">
+            <li *ngFor="let it of items; trackBy: trackBySymbol" class="item">
+              <a class="sym" [routerLink]="['/symbol', it.symbol]">
+                {{ it.symbol }}
+                <span class="tag" [class.crypto]="it.type === 'CRYPTO'">{{ it.type }}</span>
+              </a>
+
+              <span class="price">
+                <ng-container *ngIf="it.price > 0; else noPrice">
+                   {{ it.price | number:(it.type === 'CRYPTO' && it.price < 1 ? '1.4-8' : '1.2-2') }} $
+                </ng-container>
+                <ng-template #noPrice><span class="muted">—</span></ng-template>
+              </span>
+
+              <span class="chg" [class.pos]="it.changePct >= 0" [class.neg]="it.changePct < 0">
+                {{ it.changePct >= 0 ? '+' : '' }}{{ it.changePct | number:'1.2-2' }}%
+              </span>
+              
+              <span class="time muted" title="Dernière maj">
+                {{ it.ts | date:'HH:mm:ss' }}
+              </span>
+              
+              <span class="source-badge" title="Source: {{ it.source }}">
+                {{ it.source === 'BINANCE' ? '⚡' : '☁️' }}
+              </span>
+
+              <button class="btn-icon" title="Retirer" (click)="store.removeSymbol(it.symbol)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </ng-container>
+
   </ng-container>
 </section>

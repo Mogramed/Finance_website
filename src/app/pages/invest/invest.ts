@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MarketStore } from '../../core/store/market.store';
 import { MarketDataService } from '../../core/api/market-data.service';
+import { AssetType } from '../../core/api/market-interfaces'; // Import Type
 import { debounceTime, distinctUntilChanged, switchMap, startWith, map, tap } from 'rxjs';
 
 @Component({
@@ -19,29 +20,38 @@ export class Invest {
   readonly balance$ = this.store.balance$;
   readonly transactions$ = this.store.transactions$;
 
-  // Formulaires
+  // Type d'actif sélectionné (Par défaut Crypto)
+  activeType: AssetType = 'CRYPTO';
+
   readonly searchCtrl = new FormControl('', { nonNullable: true });
   readonly qtyCtrl = new FormControl(1, { nonNullable: true });
 
-  // État local
   selectedAsset: any = null;
   estimatedTotal = 0;
 
-  // Recherche
+  // Recherche réactive qui dépend du Type
   readonly suggestions$ = this.searchCtrl.valueChanges.pipe(
     debounceTime(300),
     distinctUntilChanged(),
     switchMap(val => {
       if (val.length < 2) return [];
-      return this.marketData.search(val);
+      // On passe le type actif au service
+      return this.marketData.search(val, this.activeType);
     })
   );
+
+  // Changement d'onglet
+  setType(type: AssetType) {
+    this.activeType = type;
+    this.searchCtrl.setValue(''); // On vide la recherche
+    this.selectedAsset = null;
+  }
 
   selectAsset(symbol: string) {
     this.searchCtrl.setValue(symbol, { emitEvent: false });
     this.selectedAsset = { symbol, price: 0, loading: true };
     
-    // On récupère le prix live pour afficher
+    // On lance la surveillance
     this.marketData.watch([symbol], 5000).subscribe(quotes => {
       const q = quotes.find(x => x.symbol === symbol);
       if (q) {
@@ -65,7 +75,6 @@ export class Invest {
 
   sell() {
     if (!this.selectedAsset || this.estimatedTotal <= 0) return;
-    // Vérif simple: est-ce qu'on en a ? (Le store gère la logique complexe, ici juste UI)
     this.store.executeOrder('SELL', this.selectedAsset.symbol, this.qtyCtrl.value, this.selectedAsset.price);
     this.resetForm();
   }

@@ -69,6 +69,7 @@ export interface WatchlistVm extends WatchlistItem, UniversalQuote {
   investedValue?: number;
   pnl?: number;
   pnlPct?: number;
+  dailyPnl?: number; // NOUVEAU
 }
 
 export interface MarketStats {
@@ -76,10 +77,12 @@ export interface MarketStats {
   topLoser: WatchlistVm | null;
   avgChange: number;
   totalCount: number;
-  distribution: { type: AssetType; count: number; pct: number; color: string }[];
+  // Distribution par valeur ($) et non par nombre
+  allocation: { type: AssetType; value: number; pct: number; color: string }[];
   totalInvested: number;
   totalValue: number;
   totalPnl: number;
+  dailyPnl: number; // NOUVEAU : PnL du jour
   balance: number;
   netWorth: number;
 }
@@ -90,7 +93,7 @@ type Action =
   | { type: 'ADD_SYMBOL'; symbol: string }
   | { type: 'REMOVE_SYMBOL'; symbol: string }
   | { type: 'EXECUTE_ORDER'; side: 'BUY' | 'SELL'; symbol: string; qty: number; price: number }
-  | { type: 'UPDATE_POSITION'; symbol: string; qty: number; price: number } // <--- LE RETOUR !
+  | { type: 'UPDATE_POSITION'; symbol: string; qty: number; price: number }
   | { type: 'SELECT_SYMBOL'; symbol: string | null }
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SET_MIN_CHANGE_PCT'; value: number | null }
@@ -146,7 +149,6 @@ function reducer(state: MarketState, action: Action): MarketState {
     case 'REMOVE_SYMBOL':
       return { ...state, watchlist: state.watchlist.filter(w => w.symbol !== action.symbol) };
 
-    // --- MISE À JOUR MANUELLE (Sans toucher au Cash) ---
     case 'UPDATE_POSITION': {
       return {
         ...state,
@@ -161,7 +163,6 @@ function reducer(state: MarketState, action: Action): MarketState {
       };
     }
 
-    // --- TRADING (Touche au Cash + Historique) ---
     case 'EXECUTE_ORDER': {
       const { side, symbol, qty, price } = action;
       const total = qty * price;
@@ -284,11 +285,14 @@ export class MarketStore {
           symbol: w.symbol, price: 0, changePct: 0, ts: Date.now(), source: 'MOCK', type: 'STOCK' 
         };
         const vm: WatchlistVm = { ...w, ...quote };
+        
         if (w.position && quote.price > 0) {
           vm.investedValue = w.position.quantity * w.position.avgPrice;
           vm.holdingValue = w.position.quantity * quote.price;
           vm.pnl = vm.holdingValue - vm.investedValue;
           vm.pnlPct = (vm.pnl / vm.investedValue) * 100;
+          // PnL Journalier estimé (Variation % du jour * Valeur détenue)
+          vm.dailyPnl = vm.holdingValue * (quote.changePct / 100);
         }
         return vm;
       });
@@ -296,31 +300,46 @@ export class MarketStore {
     shareReplay(1)
   );
 
+  // --- STATS AMÉLIORÉES ---
   readonly stats$ = combineLatest([this.watchlistVm$, this.balance$]).pipe(
     map(([items, balance]): MarketStats | null => {
       if (!items.length && balance === 0) return null;
+      
+      // Trier pour Gainer/Loser
       const sorted = [...items].sort((a, b) => b.changePct - a.changePct);
-      const counts: Record<string, number> = {};
+      
       let totalInvested = 0;
       let totalValue = 0;
+      let dailyPnl = 0;
+      const valueByAsset: Record<string, number> = {};
 
       items.forEach(i => {
-        counts[i.type] = (counts[i.type] || 0) + 1;
         if (i.investedValue && i.holdingValue) {
           totalInvested += i.investedValue;
           totalValue += i.holdingValue;
+          dailyPnl += (i.dailyPnl || 0);
+          
+          // Répartition par Valeur ($)
+          valueByAsset[i.type] = (valueByAsset[i.type] || 0) + i.holdingValue;
         }
       });
 
-      const distribution = Object.entries(counts).map(([type, count]) => ({
-        type: type as AssetType, count, pct: (count / items.length) * 100, color: this.getColor(type)
+      const totalPnl = totalValue - totalInvested;
+
+      // Création de l'allocation
+      const allocation = Object.entries(valueByAsset).map(([type, val]) => ({
+        type: type as AssetType, 
+        value: val, // Montant en $
+        pct: totalValue > 0 ? (val / totalValue) * 100 : 0, 
+        color: this.getColor(type)
       })).sort((a, b) => b.pct - a.pct);
 
       return { 
         topGainer: sorted[0], topLoser: sorted[sorted.length - 1], 
         avgChange: items.length ? items.reduce((acc, i) => acc + i.changePct, 0) / items.length : 0,
-        totalCount: items.length, distribution,
-        totalInvested, totalValue, totalPnl: totalValue - totalInvested,
+        totalCount: items.length, 
+        allocation, // Nouvelle répartition
+        totalInvested, totalValue, totalPnl, dailyPnl,
         balance,
         netWorth: balance + totalValue
       };
@@ -330,13 +349,14 @@ export class MarketStore {
 
   private getColor(type: string): string {
     if (type === 'CRYPTO') return '#8b5cf6';
-    if (type === 'STOCK') return '#0ea5e9';
-    return '#10b981';
+    if (type === 'STOCK') return '#38bdf8';
+    if (type === 'FOREX') return '#fbbf24';
+    return '#94a3b8';
   }
 
   readonly filteredWatchlistVm$ = combineLatest([this.watchlistVm$, this.filters$]).pipe(
     map(([items, f]) => {
-      if (f.assetType === 'STATS') return items; 
+      if (f.assetType === 'STATS') return items; // On retourne tout pour les stats
       let out = items;
       if (f.assetType !== 'ALL') out = out.filter(x => x.type === f.assetType);
       const q = f.query.trim().toUpperCase();
@@ -360,16 +380,8 @@ export class MarketStore {
 
   addSymbol(symbol: string) { this.actions$.next({ type: 'ADD_SYMBOL', symbol }); }
   removeSymbol(symbol: string) { this.actions$.next({ type: 'REMOVE_SYMBOL', symbol }); }
-  
-  // Cette méthode était manquante !
-  updatePosition(symbol: string, qty: number, price: number) { 
-    this.actions$.next({ type: 'UPDATE_POSITION', symbol, qty, price }); 
-  }
-
-  executeOrder(side: 'BUY' | 'SELL', symbol: string, qty: number, price: number) { 
-    this.actions$.next({ type: 'EXECUTE_ORDER', side, symbol, qty, price }); 
-  }
-
+  updatePosition(symbol: string, qty: number, price: number) { this.actions$.next({ type: 'UPDATE_POSITION', symbol, qty, price }); }
+  executeOrder(side: 'BUY' | 'SELL', symbol: string, qty: number, price: number) { this.actions$.next({ type: 'EXECUTE_ORDER', side, symbol, qty, price }); }
   selectSymbol(symbol: string | null) { this.actions$.next({ type: 'SELECT_SYMBOL', symbol }); }
   setQuery(query: string) { this.actions$.next({ type: 'SET_QUERY', query }); }
   setSort(sortBy: SortBy, sortDir: SortDir) { this.actions$.next({ type: 'SET_SORT', sortBy, sortDir }); }

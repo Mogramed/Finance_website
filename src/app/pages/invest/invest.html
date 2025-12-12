@@ -13,9 +13,18 @@
       <div class="card trade-card">
         <h2>Passer un ordre</h2>
         
+        <div class="type-selector">
+          <button class="type-btn" [class.active]="activeType === 'CRYPTO'" (click)="setType('CRYPTO')">Crypto</button>
+          <button class="type-btn" [class.active]="activeType === 'STOCK'" (click)="setType('STOCK')">Stocks</button>
+          <button class="type-btn" [class.active]="activeType === 'FOREX'" (click)="setType('FOREX')">Forex</button>
+        </div>
+
         <div class="form-group relative">
-          <label>Chercher un actif</label>
-          <input [formControl]="searchCtrl" class="inp search-inp" placeholder="ex: TSLA, BTC..." />
+          <label>
+            Chercher un actif 
+            <span class="badge-type">{{ activeType }}</span>
+          </label>
+          <input [formControl]="searchCtrl" class="inp search-inp" placeholder="Tapez pour rechercher..." />
           
           <div class="suggestions" *ngIf="searchCtrl.value.length >= 2 && !selectedAsset">
             <div 
@@ -33,7 +42,7 @@
           <div class="asset-head">
             <span class="sym">{{ selectedAsset.symbol }}</span>
             <span class="price" *ngIf="!selectedAsset.loading">{{ selectedAsset.price | number:'1.2-5' }} $</span>
-            <span class="loader" *ngIf="selectedAsset.loading">Chargement prix...</span>
+            <span class="loader" *ngIf="selectedAsset.loading">Chargement...</span>
           </div>
 
           <div class="form-group">
@@ -47,13 +56,13 @@
           </div>
 
           <div class="actions-row">
-            <button class="btn-trade buy" (click)="buy()">ACHETER (BUY)</button>
-            <button class="btn-trade sell" (click)="sell()">VENDRE (SELL)</button>
+            <button class="btn-trade buy" (click)="buy()">ACHETER</button>
+            <button class="btn-trade sell" (click)="sell()">VENDRE</button>
           </div>
         </div>
 
         <div class="placeholder-box" *ngIf="!selectedAsset">
-          🔍 Cherchez un actif pour commencer à trader.
+          🔍 Cherchez une {{ activeType }} pour commencer.
         </div>
       </div>
     </div>
@@ -61,7 +70,6 @@
     <div class="side-panel">
       <div class="card history-card">
         <h2>Historique Transactions</h2>
-        
         <div class="tx-list" *ngIf="transactions$ | async as txs">
           <div class="tx-item" *ngFor="let tx of txs">
             <div class="tx-left">

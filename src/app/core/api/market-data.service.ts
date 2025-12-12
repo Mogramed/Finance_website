@@ -1,13 +1,13 @@
+// ... Imports habituels
 import { Injectable, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Observable, merge, of, timer, forkJoin } from 'rxjs';
-import { switchMap, scan, shareReplay, catchError, map, take } from 'rxjs/operators';
-// ... imports existants (BinanceService, etc.) ...
+import { switchMap, scan, shareReplay, catchError, map } from 'rxjs/operators';
 import { BinanceService } from './binance.service';
 import { AlphaVantageService } from './alpha-vantage.service';
 import { FrankfurterService } from './frankfurter.service';
 import { NewsProviderService } from './news-provider.service';
-import { UniversalQuote, Candle, getAssetType, CompanyProfile } from './market-interfaces';
+import { UniversalQuote, Candle, getAssetType, CompanyProfile, AssetType } from './market-interfaces';
 
 @Injectable({ providedIn: 'root' })
 export class MarketDataService {
@@ -15,22 +15,27 @@ export class MarketDataService {
   private alpha = inject(AlphaVantageService);
   private forex = inject(FrankfurterService);
   private news = inject(NewsProviderService);
-  private platformId = inject(PLATFORM_ID); // <-- Injection de l'ID plateforme
+  private platformId = inject(PLATFORM_ID);
 
-  // ... search() ...
-  search(query: string) {
-    return this.alpha.search(query);
+  // --- RECHERCHE INTELLIGENTE ---
+  search(query: string, type: AssetType): Observable<{ symbol: string; description: string }[]> {
+    // Routage selon le type d'actif choisi
+    if (type === 'CRYPTO') {
+      return this.binance.search(query);
+    } 
+    else if (type === 'FOREX') {
+      return this.forex.search(query);
+    } 
+    else {
+      // STOCK par défaut
+      return this.alpha.search(query);
+    }
   }
 
+  // ... (Tout le reste du fichier reste inchangé : watch, getHistory, etc.) ...
   watch(symbols: string[], refreshMs = 60000): Observable<UniversalQuote[]> {
     if (symbols.length === 0) return of([]);
-
-    // PROTECTION SSR :
-    // Si on est sur le serveur, on retourne un tableau vide immédiatement
-    // pour éviter de lancer des timers ou des websockets qui planteront l'injector.
-    if (!isPlatformBrowser(this.platformId)) {
-      return of([]);
-    }
+    if (!isPlatformBrowser(this.platformId)) return of([]);
 
     const crypto = symbols.filter(s => getAssetType(s) === 'CRYPTO');
     const stocks = symbols.filter(s => getAssetType(s) === 'STOCK');
@@ -38,12 +43,10 @@ export class MarketDataService {
 
     const streams: Observable<UniversalQuote | UniversalQuote[]>[] = [];
 
-    // 1. CRYPTO
-    if (crypto.length > 0) {
-      streams.push(this.binance.connect(crypto));
-    }
+    // CRYPTO (Binance)
+    if (crypto.length > 0) streams.push(this.binance.connect(crypto));
 
-    // 2. STOCKS
+    // STOCKS (Alpha)
     if (stocks.length > 0) {
       const stockStream$ = timer(0, Math.max(refreshMs, 60000)).pipe(
         switchMap(() => {
@@ -58,7 +61,7 @@ export class MarketDataService {
       streams.push(stockStream$);
     }
 
-    // 3. FOREX
+    // FOREX (Frankfurter)
     if (currencies.length > 0) {
       const forexStream$ = timer(0, refreshMs).pipe(
         switchMap(() => {
@@ -89,7 +92,6 @@ export class MarketDataService {
     );
   }
 
-  // ... le reste (getHistory, getNews, etc.) reste identique ...
   getHistory(symbol: string, interval: string = '1h'): Observable<Candle[]> {
     const type = getAssetType(symbol);
     if (type === 'CRYPTO') return this.binance.getKlines(symbol, interval);
