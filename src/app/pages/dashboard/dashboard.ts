@@ -74,6 +74,28 @@ export class Dashboard {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe((v) => this.store.setSort(this.sortByCtrl.value as any, v as any));
   }
+
+  // NOUVEAU : Méthode pour éditer une position
+  editPosition(item: any) {
+    const qtyStr = prompt(`Quantité détenue pour ${item.symbol} ?`, item.position?.quantity || '0');
+    if (qtyStr === null) return;
+    
+    const qty = parseFloat(qtyStr);
+    if (isNaN(qty)) return;
+
+    if (qty === 0) {
+      this.store.updatePosition(item.symbol, 0, 0); // Suppression
+      return;
+    }
+
+    const priceStr = prompt(`Prix d'achat moyen ($) ?`, item.position?.avgPrice || item.price || '0');
+    if (priceStr === null) return;
+    
+    const price = parseFloat(priceStr);
+    if (!isNaN(price)) {
+      this.store.updatePosition(item.symbol, qty, price);
+    }
+  }
   
   setTab(type: FilterType) {
     this.store.setAssetType(type);

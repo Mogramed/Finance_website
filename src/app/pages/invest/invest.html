@@ -1,0 +1,83 @@
+<section class="page">
+  <div class="head">
+    <h1>Trading Terminal</h1>
+    <div class="balance-display" *ngIf="balance$ | async as bal">
+      <span class="lbl">CASH DISPONIBLE</span>
+      <span class="val">{{ bal | number:'1.2-2' }} $</span>
+    </div>
+  </div>
+
+  <div class="grid-layout">
+    
+    <div class="main-panel">
+      <div class="card trade-card">
+        <h2>Passer un ordre</h2>
+        
+        <div class="form-group relative">
+          <label>Chercher un actif</label>
+          <input [formControl]="searchCtrl" class="inp search-inp" placeholder="ex: TSLA, BTC..." />
+          
+          <div class="suggestions" *ngIf="searchCtrl.value.length >= 2 && !selectedAsset">
+            <div 
+              class="suggestion" 
+              *ngFor="let s of suggestions$ | async"
+              (click)="selectAsset(s.symbol)"
+            >
+              <strong>{{ s.symbol }}</strong> 
+              <span class="muted">{{ s.description }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="asset-preview" *ngIf="selectedAsset">
+          <div class="asset-head">
+            <span class="sym">{{ selectedAsset.symbol }}</span>
+            <span class="price" *ngIf="!selectedAsset.loading">{{ selectedAsset.price | number:'1.2-5' }} $</span>
+            <span class="loader" *ngIf="selectedAsset.loading">Chargement prix...</span>
+          </div>
+
+          <div class="form-group">
+            <label>Quantité</label>
+            <input type="number" [formControl]="qtyCtrl" (input)="updateTotal()" class="inp qty-inp" min="0.0001" />
+          </div>
+
+          <div class="total-row">
+            <span>Total estimé:</span>
+            <strong class="total-val">{{ estimatedTotal | number:'1.2-2' }} $</strong>
+          </div>
+
+          <div class="actions-row">
+            <button class="btn-trade buy" (click)="buy()">ACHETER (BUY)</button>
+            <button class="btn-trade sell" (click)="sell()">VENDRE (SELL)</button>
+          </div>
+        </div>
+
+        <div class="placeholder-box" *ngIf="!selectedAsset">
+          🔍 Cherchez un actif pour commencer à trader.
+        </div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="card history-card">
+        <h2>Historique Transactions</h2>
+        
+        <div class="tx-list" *ngIf="transactions$ | async as txs">
+          <div class="tx-item" *ngFor="let tx of txs">
+            <div class="tx-left">
+              <span class="badge" [class.buy]="tx.type === 'BUY'" [class.sell]="tx.type === 'SELL'">{{ tx.type }}</span>
+              <span class="sym">{{ tx.symbol }}</span>
+            </div>
+            <div class="tx-right">
+              <div class="amount">{{ tx.qty }} @ {{ tx.price | number:'1.2-2' }}</div>
+              <div class="total">{{ tx.total | number:'1.2-2' }} $</div>
+              <div class="date">{{ tx.date | date:'short' }}</div>
+            </div>
+          </div>
+          <div class="muted center" *ngIf="txs.length === 0">Aucune transaction.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
