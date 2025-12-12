@@ -3,31 +3,30 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   {
     path: '',
-    loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),
+    loadComponent: () => import('./layout/shell/shell').then(m => m.Shell),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
-
-      {
-        path: 'dashboard',
-        title: 'Dashboard',
-        loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard),
+      { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+      { 
+        path: 'dashboard', 
+        loadComponent: () => import('./pages/dashboard/dashboard').then(m => m.Dashboard) 
       },
+      // NOUVELLE ROUTE
       {
-        path: 'symbol/:symbol',
-        title: 'Symbol',
-        loadComponent: () => import('./pages/symbol/symbol').then((m) => m.Symbol),
+        path: 'invest',
+        loadComponent: () => import('./pages/invest/invest').then(m => m.Invest)
       },
-      {
-        path: 'settings',
-        title: 'Settings',
-        loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
+      { 
+        path: 'symbol/:symbol', 
+        loadComponent: () => import('./pages/symbol/symbol').then(m => m.Symbol) 
       },
-
-      {
-        path: '**',
-        title: 'Not Found',
-        loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
+      { 
+        path: 'settings', 
+        loadComponent: () => import('./pages/settings/settings').then(m => m.Settings) 
       },
-    ],
+    ]
+  },
+  { 
+    path: '**', 
+    loadComponent: () => import('./pages/not-found/not-found').then(m => m.NotFound) 
   },
 ];

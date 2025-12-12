@@ -18,19 +18,29 @@ import { MarketDataService } from '../api/market-data.service';
 import { UniversalQuote, AssetType } from '../api/market-interfaces';
 
 /** ---------- Types ---------- */
-export type SortBy = 'symbol' | 'addedAt' | 'changePct' | 'pnl'; // Ajout tri par PnL
+export type SortBy = 'symbol' | 'addedAt' | 'changePct' | 'pnl';
 export type SortDir = 'asc' | 'desc';
 export type FilterType = 'ALL' | AssetType | 'STATS'; 
 
 export interface Position {
   quantity: number;
-  avgPrice: number; // Prix moyen d'achat
+  avgPrice: number;
+}
+
+export interface Transaction {
+  id: string;
+  type: 'BUY' | 'SELL';
+  symbol: string;
+  qty: number;
+  price: number;
+  total: number;
+  date: number;
 }
 
 export interface WatchlistItem {
   symbol: string;
   addedAt: number;
-  position?: Position; // NOUVEAU : On peut détenir l'actif
+  position?: Position;
 }
 
 export interface Filters {
@@ -46,19 +56,19 @@ export interface Settings {
 }
 
 export interface MarketState {
+  balance: number;
+  transactions: Transaction[];
   watchlist: WatchlistItem[];
   selectedSymbol: string | null;
   filters: Filters;
   settings: Settings;
 }
 
-// ViewModel combiné (Ce qu'on affiche)
 export interface WatchlistVm extends WatchlistItem, UniversalQuote {
-  // Champs calculés pour le portefeuille
-  holdingValue?: number; // Valeur actuelle (qty * livePrice)
-  investedValue?: number; // Montant investi (qty * avgPrice)
-  pnl?: number; // Profit/Perte en $
-  pnlPct?: number; // Profit/Perte en %
+  holdingValue?: number;
+  investedValue?: number;
+  pnl?: number;
+  pnlPct?: number;
 }
 
 export interface MarketStats {
@@ -67,10 +77,11 @@ export interface MarketStats {
   avgChange: number;
   totalCount: number;
   distribution: { type: AssetType; count: number; pct: number; color: string }[];
-  // Stats Portefeuille
   totalInvested: number;
   totalValue: number;
   totalPnl: number;
+  balance: number;
+  netWorth: number;
 }
 
 /** ---------- Actions ---------- */
@@ -78,7 +89,8 @@ type Action =
   | { type: '@@INIT' }
   | { type: 'ADD_SYMBOL'; symbol: string }
   | { type: 'REMOVE_SYMBOL'; symbol: string }
-  | { type: 'UPDATE_POSITION'; symbol: string; qty: number; price: number } // NOUVEAU
+  | { type: 'EXECUTE_ORDER'; side: 'BUY' | 'SELL'; symbol: string; qty: number; price: number }
+  | { type: 'UPDATE_POSITION'; symbol: string; qty: number; price: number } // <--- LE RETOUR !
   | { type: 'SELECT_SYMBOL'; symbol: string | null }
   | { type: 'SET_QUERY'; query: string }
   | { type: 'SET_MIN_CHANGE_PCT'; value: number | null }
@@ -87,8 +99,7 @@ type Action =
   | { type: 'SET_REFRESH_MS'; refreshMs: number }
   | { type: 'RESET' };
 
-/** ---------- Storage Utils ---------- */
-const STORAGE_KEY = 'rmd.market.v4'; // V4 car changement de structure
+const STORAGE_KEY = 'rmd.market.v5'; 
 
 function getLocalStorage() {
   try { return typeof globalThis !== 'undefined' ? localStorage : null; } catch { return null; }
@@ -97,24 +108,25 @@ function getLocalStorage() {
 function loadPersisted(): Partial<MarketState> {
   const ls = getLocalStorage();
   if (!ls) return {};
-  try {
-    const parsed = JSON.parse(ls.getItem(STORAGE_KEY) || '{}');
-    return parsed;
-  } catch { return {}; }
+  try { return JSON.parse(ls.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
 }
 
 function persistState(s: MarketState) {
   const ls = getLocalStorage();
-  if (ls) ls.setItem(STORAGE_KEY, JSON.stringify({ watchlist: s.watchlist, settings: s.settings }));
+  if (ls) ls.setItem(STORAGE_KEY, JSON.stringify({ 
+    watchlist: s.watchlist, 
+    settings: s.settings, 
+    balance: s.balance, 
+    transactions: s.transactions 
+  }));
 }
 
-/** ---------- Reducer ---------- */
 const DEFAULT_STATE: MarketState = {
+  balance: 50000, 
+  transactions: [],
   watchlist: [
     { symbol: 'BTCUSDT', addedAt: Date.now() },
-    { symbol: 'ETHUSDT', addedAt: Date.now() },
-    { symbol: 'AAPL', addedAt: Date.now() },
-    { symbol: 'EUR/USD', addedAt: Date.now() }
+    { symbol: 'AAPL', addedAt: Date.now() }
   ],
   selectedSymbol: null,
   filters: { query: '', minChangePct: null, sortBy: 'addedAt', sortDir: 'desc', assetType: 'ALL' },
@@ -134,12 +146,12 @@ function reducer(state: MarketState, action: Action): MarketState {
     case 'REMOVE_SYMBOL':
       return { ...state, watchlist: state.watchlist.filter(w => w.symbol !== action.symbol) };
 
-    case 'UPDATE_POSITION': // Met à jour ou crée une position
+    // --- MISE À JOUR MANUELLE (Sans toucher au Cash) ---
+    case 'UPDATE_POSITION': {
       return {
         ...state,
         watchlist: state.watchlist.map(w => {
           if (w.symbol !== action.symbol) return w;
-          // Si quantité 0, on supprime la position mais on garde l'item en watchlist
           if (action.qty <= 0) {
             const { position, ...rest } = w;
             return rest;
@@ -147,22 +159,83 @@ function reducer(state: MarketState, action: Action): MarketState {
           return { ...w, position: { quantity: action.qty, avgPrice: action.price } };
         })
       };
+    }
+
+    // --- TRADING (Touche au Cash + Historique) ---
+    case 'EXECUTE_ORDER': {
+      const { side, symbol, qty, price } = action;
+      const total = qty * price;
+      
+      if (side === 'BUY' && total > state.balance) {
+        alert("Pas assez de cash !"); 
+        return state;
+      }
+
+      const newBalance = side === 'BUY' ? state.balance - total : state.balance + total;
+
+      const tx: Transaction = {
+        id: Date.now().toString(),
+        type: side,
+        symbol, qty, price, total,
+        date: Date.now()
+      };
+
+      const existingItem = state.watchlist.find(w => w.symbol === symbol);
+      let newWatchlist = [...state.watchlist];
+
+      if (!existingItem) {
+        if (side === 'BUY') {
+          newWatchlist.unshift({ 
+            symbol, 
+            addedAt: Date.now(), 
+            position: { quantity: qty, avgPrice: price } 
+          });
+        }
+      } else {
+        newWatchlist = newWatchlist.map(w => {
+          if (w.symbol !== symbol) return w;
+          
+          const currentQty = w.position?.quantity || 0;
+          const currentAvg = w.position?.avgPrice || 0;
+          
+          let newQty = 0;
+          let newAvg = 0;
+
+          if (side === 'BUY') {
+            newQty = currentQty + qty;
+            const currentInvested = currentQty * currentAvg;
+            newAvg = (currentInvested + total) / newQty;
+          } else {
+            newQty = Math.max(0, currentQty - qty);
+            newAvg = currentAvg; 
+          }
+
+          if (newQty === 0) {
+            const { position, ...rest } = w;
+            return rest;
+          }
+          return { ...w, position: { quantity: newQty, avgPrice: newAvg } };
+        });
+      }
+
+      return {
+        ...state,
+        balance: newBalance,
+        transactions: [tx, ...state.transactions].slice(0, 50),
+        watchlist: newWatchlist
+      };
+    }
       
     case 'SELECT_SYMBOL':
       return { ...state, selectedSymbol: action.symbol };
-      
     case 'SET_QUERY':
       return { ...state, filters: { ...state.filters, query: action.query } };
-      
     case 'SET_MIN_CHANGE_PCT':
       return { ...state, filters: { ...state.filters, minChangePct: action.value } };
-      
     case 'SET_SORT':
       return { ...state, filters: { ...state.filters, sortBy: action.sortBy, sortDir: action.sortDir } };
-      
     case 'SET_ASSET_TYPE': 
       return { ...state, filters: { ...state.filters, assetType: action.assetType } };
-      
     case 'SET_REFRESH_MS':
       return { ...state, settings: { ...state.settings, refreshMs: action.refreshMs } };
       
@@ -170,11 +243,9 @@ function reducer(state: MarketState, action: Action): MarketState {
   }
 }
 
-/** ---------- Store ---------- */
 @Injectable({ providedIn: 'root' })
 export class MarketStore {
   private readonly marketData = inject(MarketDataService);
-  
   private readonly actions$ = new Subject<Action>();
   private readonly snapshotSubject = new BehaviorSubject<MarketState>(this.computeInitialState());
   
@@ -187,24 +258,24 @@ export class MarketStore {
     shareReplay({ bufferSize: 1, refCount: false })
   );
 
-  // --- Selectors ---
-  readonly watchlist$ = this.snapshot$.pipe(map(s => s.watchlist), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
-  readonly settings$ = this.snapshot$.pipe(map(s => s.settings), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
-  readonly filters$ = this.snapshot$.pipe(map(s => s.filters), distinctUntilChanged(), shareReplay({ bufferSize: 1, refCount: true }));
+  // Selectors
+  readonly watchlist$ = this.snapshot$.pipe(map(s => s.watchlist), distinctUntilChanged(), shareReplay(1));
+  readonly settings$ = this.snapshot$.pipe(map(s => s.settings), distinctUntilChanged(), shareReplay(1));
+  readonly filters$ = this.snapshot$.pipe(map(s => s.filters), distinctUntilChanged(), shareReplay(1));
+  readonly balance$ = this.snapshot$.pipe(map(s => s.balance), distinctUntilChanged(), shareReplay(1));
+  readonly transactions$ = this.snapshot$.pipe(map(s => s.transactions), distinctUntilChanged(), shareReplay(1));
   
   readonly watchlistCount$ = this.watchlist$.pipe(map(w => w.length));
   readonly hasToken$ = this.snapshot$.pipe(map(() => true)); 
 
-  // --- Live Feed ---
   readonly quotes$ = combineLatest([this.watchlist$, this.settings$]).pipe(
     switchMap(([list, settings]) => {
       const symbols = list.map(w => w.symbol);
       return this.marketData.watch(symbols, settings.refreshMs);
     }),
-    shareReplay({ bufferSize: 1, refCount: true })
+    shareReplay(1)
   );
 
-  // --- Vue Combinée (Avec calculs PnL) ---
   readonly watchlistVm$ = combineLatest([this.watchlist$, this.quotes$]).pipe(
     map(([list, quotes]) => {
       const qMap = new Map(quotes.map(q => [q.symbol, q]));
@@ -212,30 +283,23 @@ export class MarketStore {
         const quote = qMap.get(w.symbol) ?? { 
           symbol: w.symbol, price: 0, changePct: 0, ts: Date.now(), source: 'MOCK', type: 'STOCK' 
         };
-
         const vm: WatchlistVm = { ...w, ...quote };
-
-        // CALCUL PNL SI POSITION
         if (w.position && quote.price > 0) {
           vm.investedValue = w.position.quantity * w.position.avgPrice;
           vm.holdingValue = w.position.quantity * quote.price;
           vm.pnl = vm.holdingValue - vm.investedValue;
           vm.pnlPct = (vm.pnl / vm.investedValue) * 100;
         }
-
         return vm;
       });
     }),
-    shareReplay({ bufferSize: 1, refCount: true })
+    shareReplay(1)
   );
 
-  // --- STATS GLOBALES ---
-  readonly stats$ = this.watchlistVm$.pipe(
-    map((items): MarketStats | null => {
-      if (!items.length) return null;
-
+  readonly stats$ = combineLatest([this.watchlistVm$, this.balance$]).pipe(
+    map(([items, balance]): MarketStats | null => {
+      if (!items.length && balance === 0) return null;
       const sorted = [...items].sort((a, b) => b.changePct - a.changePct);
-      
       const counts: Record<string, number> = {};
       let totalInvested = 0;
       let totalValue = 0;
@@ -253,17 +317,15 @@ export class MarketStore {
       })).sort((a, b) => b.pct - a.pct);
 
       return { 
-        topGainer: sorted[0], 
-        topLoser: sorted[sorted.length - 1], 
-        avgChange: items.reduce((acc, i) => acc + i.changePct, 0) / items.length,
-        totalCount: items.length, 
-        distribution,
-        totalInvested,
-        totalValue,
-        totalPnl: totalValue - totalInvested
+        topGainer: sorted[0], topLoser: sorted[sorted.length - 1], 
+        avgChange: items.length ? items.reduce((acc, i) => acc + i.changePct, 0) / items.length : 0,
+        totalCount: items.length, distribution,
+        totalInvested, totalValue, totalPnl: totalValue - totalInvested,
+        balance,
+        netWorth: balance + totalValue
       };
     }),
-    shareReplay({ bufferSize: 1, refCount: true })
+    shareReplay(1)
   );
 
   private getColor(type: string): string {
@@ -272,19 +334,14 @@ export class MarketStore {
     return '#10b981';
   }
 
-  // --- Filtrage ---
   readonly filteredWatchlistVm$ = combineLatest([this.watchlistVm$, this.filters$]).pipe(
     map(([items, f]) => {
       if (f.assetType === 'STATS') return items; 
-
       let out = items;
       if (f.assetType !== 'ALL') out = out.filter(x => x.type === f.assetType);
-      
       const q = f.query.trim().toUpperCase();
       if (q) out = out.filter(x => x.symbol.includes(q));
-      
       if (f.minChangePct) out = out.filter(x => x.changePct >= f.minChangePct!);
-
       const dir = f.sortDir === 'asc' ? 1 : -1;
       out = [...out].sort((a, b) => {
         let valA: any = a[f.sortBy] ?? 0;
@@ -294,20 +351,25 @@ export class MarketStore {
       });
       return out;
     }),
-    shareReplay({ bufferSize: 1, refCount: true })
+    shareReplay(1)
   );
 
   constructor() {
     this.state$.pipe(skip(1), tap(persistState)).subscribe();
   }
 
-  // --- API ---
   addSymbol(symbol: string) { this.actions$.next({ type: 'ADD_SYMBOL', symbol }); }
   removeSymbol(symbol: string) { this.actions$.next({ type: 'REMOVE_SYMBOL', symbol }); }
+  
+  // Cette méthode était manquante !
   updatePosition(symbol: string, qty: number, price: number) { 
     this.actions$.next({ type: 'UPDATE_POSITION', symbol, qty, price }); 
   }
-  
+
+  executeOrder(side: 'BUY' | 'SELL', symbol: string, qty: number, price: number) { 
+    this.actions$.next({ type: 'EXECUTE_ORDER', side, symbol, qty, price }); 
+  }
+
   selectSymbol(symbol: string | null) { this.actions$.next({ type: 'SELECT_SYMBOL', symbol }); }
   setQuery(query: string) { this.actions$.next({ type: 'SET_QUERY', query }); }
   setSort(sortBy: SortBy, sortDir: SortDir) { this.actions$.next({ type: 'SET_SORT', sortBy, sortDir }); }
